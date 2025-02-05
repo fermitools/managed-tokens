@@ -67,7 +67,7 @@ func getDesiredUIDByOverrideOrLookup(ctx context.Context, serviceConfigPath stri
 // getVaultTokenStoreHoldoffFuncOpt examines the passed-in service to determine whether to
 // return a NOOP func, or if the service is a experimentOverriddenService,
 // a func(*worker.Config) that sets the vault token store holdoff for the passed in Config
-func getVaultTokenStoreHoldoffFuncOpt(s service.Service) func(*worker.Config) error {
+func getVaultTokenStoreHoldoffFuncOpt(s service.Service) worker.ConfigOption {
 	if _, ok := s.(*experimentOverriddenService); ok {
 		return worker.SetVaultTokenStoreHoldoff()
 	}
@@ -79,7 +79,7 @@ type workerRetryConfig struct {
 	retrySleep time.Duration
 }
 
-func setAllWorkerRetryValues(workerRetryMap map[worker.WorkerType]workerRetryConfig) func(*worker.Config) error {
+func setAllWorkerRetryValues(workerRetryMap map[worker.WorkerType]workerRetryConfig) worker.ConfigOption {
 	return func(c *worker.Config) error {
 		for wt, wr := range workerRetryMap {
 			worker.SetWorkerNumRetriesValue(wt, wr.numRetries)(c)
