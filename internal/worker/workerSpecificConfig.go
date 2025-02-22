@@ -21,25 +21,38 @@ import (
 	"time"
 )
 
-// workerSpecificConfigOption is a type that represents a worker-specific configuration option.
-type workerSpecificConfigOption uint8
+// WorkerSpecificConfigOption is a type that represents a worker-specific configuration option.
+type WorkerSpecificConfigOption uint8
 
 const (
-	// numRetriesOption is a worker-specific configuration option that represents the number of times a worker should retry a task before giving up.
-	numRetriesOption workerSpecificConfigOption = iota
-	// retrySleepOption is a worker-specific configuration option that represents the time.Duration a worker should sleep between retries
-	retrySleepOption
-	invalid
+	// NumRetriesOption is a worker-specific configuration option that represents the number of times a worker should retry a task before giving up.
+	NumRetriesOption WorkerSpecificConfigOption = iota
+	// RetrySleepOption is a worker-specific configuration option that represents the time.Duration a worker should sleep between retries
+	RetrySleepOption
+	invalidWorkerSpecificConfigOption
 )
 
-// SetWorkerRetryValue is a function that sets the retry value for a specific worker type.  It returns a ConfigOption
-func SetWorkerNumRetriesValue(w WorkerType, value uint) ConfigOption {
+// SetWorkerSpecificConfigOption returns a ConfigOption that sets a worker-specific configuration option
+// to the given value.
+func SetWorkerSpecificConfigOption(w WorkerType, option WorkerSpecificConfigOption, value any) ConfigOption {
 	return ConfigOption(func(c *Config) error {
 		if !isValidWorkerType(w) {
 			return errors.New("invalid worker type")
 		}
 
-		c.workerSpecificConfig[w][numRetriesOption] = value
+		if !isValidWorkerSpecificConfigOption(option) {
+			return errors.New("invalid worker-specific configuration option")
+		}
+
+		if c.workerSpecificConfig == nil {
+			c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+		}
+
+		if c.workerSpecificConfig[w] == nil {
+			c.workerSpecificConfig[w] = make(map[WorkerSpecificConfigOption]any)
+		}
+
+		c.workerSpecificConfig[w][option] = value
 		return nil
 	})
 }
@@ -56,24 +69,12 @@ func getWorkerNumRetriesValueFromConfig(c Config, w WorkerType) (uint, error) {
 		return 0, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
 	}
 
-	valUInt, ok := val[numRetriesOption].(uint)
+	valUInt, ok := val[NumRetriesOption].(uint)
 	if !ok {
 		return 0, fmt.Errorf("value for workerType %s is not of type uint.  Got type %T", w, val)
 	}
 
 	return valUInt, nil
-}
-
-// SetWorkerRetrySleepValue is a function that sets the retry sleep value for a specific worker type.  It returns a ConfigOption
-func SetWorkerRetrySleepValue(w WorkerType, value time.Duration) ConfigOption {
-	return ConfigOption(func(c *Config) error {
-		if !isValidWorkerType(w) {
-			return errors.New("invalid worker type")
-		}
-
-		c.workerSpecificConfig[w][retrySleepOption] = value
-		return nil
-	})
 }
 
 // getWorkerRetrySleepValueFromConfig retrieves the retrySleepValue for a specific worker type from the given configuration.
@@ -87,7 +88,7 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 		return 0, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
 	}
 
-	valTime, ok := val[retrySleepOption].(time.Duration)
+	valTime, ok := val[RetrySleepOption].(time.Duration)
 	if !ok {
 		return 0, fmt.Errorf("value for workerType %s is not of type time.Duration.  Got type %T", w, val)
 	}
@@ -95,6 +96,6 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 	return valTime, nil
 }
 
-func isValidWorkerSpecificConfigOption(option workerSpecificConfigOption) bool {
-	return option < invalid
+func isValidWorkerSpecificConfigOption(option WorkerSpecificConfigOption) bool {
+	return option < invalidWorkerSpecificConfigOption
 }
