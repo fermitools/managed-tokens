@@ -26,7 +26,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/fermitools/managed-tokens/internal/db"
-	"github.com/fermitools/managed-tokens/internal/service"
 	"github.com/fermitools/managed-tokens/internal/worker"
 )
 
@@ -62,16 +61,6 @@ func getDesiredUIDByOverrideOrLookup(ctx context.Context, serviceConfigPath stri
 		"uid":      uid,
 	}).Debug("Got UID")
 	return uint32(uid), nil
-}
-
-// getVaultTokenStoreHoldoffFuncOpt examines the passed-in service to determine whether to
-// return a NOOP func, or if the service is a experimentOverriddenService,
-// a func(*worker.Config) that sets the vault token store holdoff for the passed in Config
-func getVaultTokenStoreHoldoffFuncOpt(s service.Service) worker.ConfigOption {
-	if _, ok := s.(*experimentOverriddenService); ok {
-		return worker.SetVaultTokenStoreHoldoff()
-	}
-	return func(c *worker.Config) error { return nil } // NOOP
 }
 
 type workerRetryConfig struct {

@@ -388,7 +388,6 @@ func run(ctx context.Context) error {
 			keytabPath := getKeytabFromConfiguration(serviceConfigPath)
 			defaultRoleFileDestinationTemplate := getDefaultRoleFileDestinationTemplate(serviceConfigPath)
 			serviceCreddVaultTokenPathRoot := getServiceCreddVaultTokenPathRoot(serviceConfigPath)
-			vaultTokenStoreHoldoffFunc := getVaultTokenStoreHoldoffFuncOpt(s)
 			fileCopierOptions := getFileCopierOptionsFromConfig(serviceConfigPath)
 			extraPingOpts := getPingOptsFromConfig(serviceConfigPath)
 			sshOpts := getSSHOptsFromConfig(serviceConfigPath)
@@ -413,7 +412,6 @@ func run(ctx context.Context) error {
 				worker.SetSupportedExtrasKeyValue(worker.FileCopierOptions, fileCopierOptions),
 				worker.SetSupportedExtrasKeyValue(worker.PingOptions, extraPingOpts),
 				worker.SetSupportedExtrasKeyValue(worker.SSHOptions, sshOpts),
-				vaultTokenStoreHoldoffFunc,
 			)
 			if err != nil {
 				tracing.LogErrorWithTrace(span, funcLogger, "Could not create config for service")

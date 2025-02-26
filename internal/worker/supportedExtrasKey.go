@@ -22,9 +22,11 @@ type supportedExtrasKey int
 const (
 	// DefaultRoleFileTemplate is a key to store the value of the default role file template in the Config.Extras map
 	DefaultRoleFileDestinationTemplate supportedExtrasKey = iota
+	// FileCopierOptions allows the user to specify options for the file copier
 	FileCopierOptions
-	VaultTokenStoreHoldoff
+	// PingOptions allows the user to specify options for the PingAggregatorWorker to use
 	PingOptions
+	// SSHOptions allows the user to specify options for the PushTokensWorker to use when pushing files to the destination nodes
 	SSHOptions
 )
 
@@ -34,8 +36,6 @@ func (s supportedExtrasKey) String() string {
 		return "DefaultRoleFileDestinationTemplate"
 	case FileCopierOptions:
 		return "FileCopierOptions"
-	case VaultTokenStoreHoldoff:
-		return "VaultTokenStoreHoldoff"
 	case PingOptions:
 		return "PingOptions"
 	case SSHOptions:
@@ -64,18 +64,6 @@ func SetSupportedExtrasKeyValue(key supportedExtrasKey, value any) func(*Config)
 func GetDefaultRoleFileDestinationTemplateValueFromExtras(c *Config) (string, bool) {
 	defaultRoleFileDestinationTemplateString, ok := c.Extras[DefaultRoleFileDestinationTemplate].(string)
 	return defaultRoleFileDestinationTemplateString, ok
-}
-
-// GetVaultTokenStoreHoldoff returns the value from the Config for the Extras VaultTokenStoreHoldoff key.
-// It also returns a bool, ok, indicating whether this value should be used or not.
-func GetVaultTokenStoreHoldoff(c *Config) (holdoff bool, ok bool) {
-	holdoff, ok = c.Extras[VaultTokenStoreHoldoff].(bool)
-	return holdoff, ok
-}
-
-// SetVaultTokenStoreHoldoff returns a func(*Config) that sets the VaultTokenStoreHoldoff Extras key of the *Config to true
-func SetVaultTokenStoreHoldoff() func(*Config) error {
-	return SetSupportedExtrasKeyValue(VaultTokenStoreHoldoff, true)
 }
 
 // defaultFileCopierOpts assumes that the FileCopier will implement rsync, and thus the default options will render the
