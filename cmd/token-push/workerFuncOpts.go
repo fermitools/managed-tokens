@@ -18,6 +18,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -54,7 +55,7 @@ func getDesiredUIDByOverrideOrLookup(ctx context.Context, serviceConfigPath stri
 	uid, err := database.GetUIDByUsername(ctx, username)
 	if err != nil {
 		log.Error("Could not get UID by username")
-		return 0, err
+		return 0, fmt.Errorf("could not get UID by username: %w", err)
 	}
 	log.WithFields(log.Fields{
 		"username": username,
