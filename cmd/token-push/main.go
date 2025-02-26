@@ -276,30 +276,10 @@ func run(ctx context.Context) error {
 	}
 
 	// Worker-specific config that is service-independent to be passed to the worker.Config constructor
-	// Note - this will be made less verbose when #114-115 are done TODO
-	workerRetryMap := make(map[worker.WorkerType]workerRetryConfig)
-
-	_retryArgs := []struct {
-		worker.WorkerType
-		checkTimeout time.Duration
-	}{
-		{worker.GetKerberosTicketsWorkerType, timeouts[timeoutKerberos]},
-		{worker.StoreAndGetTokenWorkerType, timeouts[timeoutVaultStorer]},
-		{worker.StoreAndGetTokenInteractiveWorkerType, timeouts[timeoutVaultStorer]},
-		{worker.PingAggregatorWorkerType, timeouts[timeoutPing]},
-		{worker.PushTokensWorkerType, timeouts[timeoutPush]},
-	}
-	for _, retryArg := range _retryArgs {
-		numRetries, retrySleep, err := getAndCheckRetryInfoFromConfig(retryArg.WorkerType, retryArg.checkTimeout)
-		if err != nil {
-			msg := fmt.Sprintf("invalid timeout %s: %s", workerTypeToConfigString(retryArg.WorkerType), err.Error())
-			tracing.LogErrorWithTrace(span, exeLogger, msg)
-			return errors.New(msg)
-		}
-		workerRetryMap[retryArg.WorkerType] = workerRetryConfig{
-			numRetries: uint(numRetries),
-			retrySleep: retrySleep,
-		}
+	workerRetryMap, err := createWorkerRetryMap(timeouts)
+	if err != nil {
+		exeLogger.Error("Could not create worker retry map. Will run without retries")
+		workerRetryMap = setDefaultWorkerRetryMap()
 	}
 
 	// All the cleanup actions that should run any time run() returns
@@ -328,7 +308,7 @@ func run(ctx context.Context) error {
 
 	// Create temporary dir for all kerberos caches to live in
 	var kerbCacheDir string
-	kerbCacheDir, err := os.MkdirTemp("", "managed-tokens")
+	kerbCacheDir, err = os.MkdirTemp("", "managed-tokens")
 	if err != nil {
 		exeLogger.Error("Cannot create temporary dir for kerberos cache. Will just use os.TempDir")
 		kerbCacheDir = os.TempDir()
