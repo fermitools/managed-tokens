@@ -17,6 +17,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/fermitools/managed-tokens/internal/service"
 	"github.com/fermitools/managed-tokens/internal/testUtils"
+	"github.com/fermitools/managed-tokens/internal/worker"
 )
 
 // Helper funcs
@@ -1206,6 +1208,165 @@ func TestCheckRetryTimeout(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestCreateWorkerRetryMap(t *testing.T) {
+	type testCase struct {
+		description     string
+		timeoutsMap     map[timeoutKey]time.Duration
+		testConfigSetup func()
+		expected        map[worker.WorkerType]workerRetryConfig
+		expectedErrFunc func(*testing.T, error)
+	}
+
+	testCases := []testCase{
+		{
+			description: "Valid case",
+			timeoutsMap: map[timeoutKey]time.Duration{
+				timeoutGlobal:      1000 * time.Second,
+				timeoutKerberos:    1000 * time.Second,
+				timeoutVaultStorer: 1000 * time.Second,
+				timeoutPing:        1000 * time.Second,
+				timeoutPush:        1000 * time.Second,
+			},
+			testConfigSetup: func() {
+				viper.Set("workerType.GetKerberosTickets.numRetries", 1)
+				viper.Set("workerType.GetKerberosTickets.retrySleep", "1s")
+				viper.Set("workerType.StoreAndGetTokenInteractive.numRetries", 1)
+				viper.Set("workerType.StoreAndGetTokenInteractive.retrySleep", "1s")
+				viper.Set("workerType.StoreAndGetToken.numRetries", 1)
+				viper.Set("workerType.StoreAndGetToken.retrySleep", "1s")
+				viper.Set("workerType.PingAggregator.numRetries", 1)
+				viper.Set("workerType.PingAggregator.retrySleep", "1s")
+				viper.Set("workerType.PushTokens.numRetries", 1)
+				viper.Set("workerType.PushTokens.retrySleep", "1s")
+			},
+			expected: map[worker.WorkerType]workerRetryConfig{
+				worker.GetKerberosTicketsWorkerType: {
+					numRetries: 1,
+					retrySleep: 1 * time.Second,
+				},
+				worker.StoreAndGetTokenInteractiveWorkerType: {
+					numRetries: 1,
+					retrySleep: 1 * time.Second,
+				},
+				worker.StoreAndGetTokenWorkerType: {
+					numRetries: 1,
+					retrySleep: 1 * time.Second,
+				},
+				worker.PingAggregatorWorkerType: {
+					numRetries: 1,
+					retrySleep: 1 * time.Second,
+				},
+				worker.PushTokensWorkerType: {
+					numRetries: 1,
+					retrySleep: 1 * time.Second,
+				},
+			},
+			expectedErrFunc: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			description: "Invalid case",
+			timeoutsMap: map[timeoutKey]time.Duration{
+				timeoutGlobal:      10 * time.Second,
+				timeoutKerberos:    10 * time.Second,
+				timeoutVaultStorer: 10 * time.Second,
+				timeoutPing:        10 * time.Second,
+				timeoutPush:        10 * time.Second,
+			},
+			testConfigSetup: func() {
+				viper.Set("workerType.GetKerberosTickets.numRetries", 10)
+				viper.Set("workerType.GetKerberosTickets.retrySleep", "10s")
+				viper.Set("workerType.StoreAndGetTokenInteractive.numRetries", 10)
+				viper.Set("workerType.StoreAndGetTokenInteractive.retrySleep", "10s")
+				viper.Set("workerType.StoreAndGetToken.numRetries", 10)
+				viper.Set("workerType.StoreAndGetToken.retrySleep", "10s")
+				viper.Set("workerType.PingAggregator.numRetries", 10)
+				viper.Set("workerType.PingAggregator.retrySleep", "10s")
+				viper.Set("workerType.PushTokens.numRetries", 10)
+				viper.Set("workerType.PushTokens.retrySleep", "10s")
+			},
+			expected: nil,
+			expectedErrFunc: func(t *testing.T, err error) {
+				assert.ErrorContains(t, err, "invalid timeout")
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.description, func(t *testing.T) {
+			viper.Reset()
+			defer viper.Reset()
+			test.testConfigSetup()
+			workerRetryMap, err := createWorkerRetryMap(test.timeoutsMap)
+			assert.Equal(t, test.expected, workerRetryMap)
+			test.expectedErrFunc(t, err)
+		})
+	}
+
+}
+
+func TestSetDefaultWorkerRetryMap(t *testing.T) {
+	m := setDefaultWorkerRetryMap()
+	for _, wt := range validWorkerTypes {
+		val, ok := m[wt]
+		if !ok {
+			t.Errorf("Expected worker type %s not found in map", wt)
+		}
+		assert.Equal(t, val.numRetries, uint(0))
+		assert.Equal(t, val.retrySleep, 0*time.Second)
+	}
+}
+
+func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		workerType    worker.WorkerType
+		checkTimeout  time.Duration
+		numRetries    int
+		retrySleep    time.Duration
+		expectedError error
+	}{
+		{
+			name:          "Valid configuration",
+			workerType:    worker.GetKerberosTicketsWorkerType,
+			checkTimeout:  10 * time.Second,
+			numRetries:    3,
+			retrySleep:    2 * time.Second,
+			expectedError: nil,
+		},
+		{
+			name:          "Invalid configuration - timeout less than retry duration",
+			workerType:    worker.GetKerberosTicketsWorkerType,
+			checkTimeout:  5 * time.Second,
+			numRetries:    3,
+			retrySleep:    2 * time.Second,
+			expectedError: errors.New("timeout is less than the time it would take to retry all attempts.  Will stop now"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Reset()
+			defer viper.Reset()
+			viper.Set("workerType."+workerTypeToConfigString(tt.workerType)+".numRetries", tt.numRetries)
+			viper.Set("workerType."+workerTypeToConfigString(tt.workerType)+".retrySleep", tt.retrySleep.String())
+
+			numRetries, retrySleep, err := getAndCheckRetryInfoFromConfig(tt.workerType, tt.checkTimeout)
+			if tt.expectedError != nil {
+				assert.EqualError(t, err, tt.expectedError.Error())
+				assert.Equal(t, 0, numRetries)
+				assert.Equal(t, time.Duration(0), retrySleep)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.numRetries, numRetries)
+			assert.Equal(t, tt.retrySleep, retrySleep)
 		})
 	}
 }

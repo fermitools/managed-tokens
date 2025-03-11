@@ -208,9 +208,9 @@ func TestBackupConfig(t *testing.T) {
 	}
 	c1.unPingableNodes = &unPingableNodes{sync.Map{}}
 	c1.unPingableNodes.Store("foo", struct{}{})
-	c1.workerSpecificConfig = map[WorkerType]map[workerSpecificConfigOption]any{
+	c1.workerSpecificConfig = map[WorkerType]map[WorkerSpecificConfigOption]any{
 		PushTokensWorkerType: {
-			numRetriesOption: 5,
+			NumRetriesOption: 5,
 		},
 	}
 
@@ -246,7 +246,7 @@ func TestInitializeWorkerSpecificConfigDefaults(t *testing.T) {
 		if !ok {
 			t.Errorf("Expected key %v not found in map", wt)
 		}
-		valInt, ok := val[numRetriesOption].(int)
+		valInt, ok := val[NumRetriesOption].(int)
 		if !ok {
 			t.Errorf("Expected value of type int, got %T", m[wt])
 		}

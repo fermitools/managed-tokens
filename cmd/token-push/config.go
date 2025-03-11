@@ -39,6 +39,7 @@ import (
 
 	"github.com/fermitools/managed-tokens/internal/environment"
 	"github.com/fermitools/managed-tokens/internal/service"
+	"github.com/fermitools/managed-tokens/internal/worker"
 )
 
 var (
@@ -450,9 +451,65 @@ func parseVaultServerFromEnvSetting(envSetting string) (string, error) {
 	return *vaultServerPtr, nil
 }
 
+// createWorkerRetryMap creates a map of worker.WorkerTypes to their retry configuration.
+// It validates each set of retry count/sleep duration values against the total
+// configured timeout for that WorkerType before adding them to the map.
+func createWorkerRetryMap(timeoutsMap map[timeoutKey]time.Duration) (map[worker.WorkerType]workerRetryConfig, error) {
+	workerRetryMap := make(map[worker.WorkerType]workerRetryConfig)
+
+	_retryArgs := []struct {
+		worker.WorkerType
+		// The timeout that we should be validating before using it
+		checkTimeout time.Duration
+	}{
+		{worker.GetKerberosTicketsWorkerType, timeoutsMap[timeoutKerberos]},
+		{worker.StoreAndGetTokenWorkerType, timeoutsMap[timeoutVaultStorer]},
+		{worker.StoreAndGetTokenInteractiveWorkerType, timeoutsMap[timeoutVaultStorer]},
+		{worker.PingAggregatorWorkerType, timeoutsMap[timeoutPing]},
+		{worker.PushTokensWorkerType, timeoutsMap[timeoutPush]},
+	}
+	for _, retryArg := range _retryArgs {
+		numRetries, retrySleep, err := getAndCheckRetryInfoFromConfig(retryArg.WorkerType, retryArg.checkTimeout)
+		if err != nil {
+			msg := fmt.Sprintf("invalid timeout %s: %s", workerTypeToConfigString(retryArg.WorkerType), err.Error())
+			return nil, errors.New(msg)
+		}
+		workerRetryMap[retryArg.WorkerType] = workerRetryConfig{
+			numRetries: uint(numRetries),
+			retrySleep: retrySleep,
+		}
+	}
+	return workerRetryMap, nil
+}
+
 func checkRetryTimeout(numRetries int, retrySleepDuration time.Duration, timeout time.Duration) error {
 	if timeout < time.Duration(numRetries)*retrySleepDuration {
 		return fmt.Errorf("timeout (%s) is less than numRetries*retrySleepDuration (%s)", timeout, time.Duration(numRetries)*retrySleepDuration)
 	}
 	return nil
+}
+
+func setDefaultWorkerRetryMap() map[worker.WorkerType]workerRetryConfig {
+	m := make(map[worker.WorkerType]workerRetryConfig)
+	for _, wt := range validWorkerTypes {
+		m[wt] = workerRetryConfig{
+			numRetries: 0,
+			retrySleep: time.Duration(0 * time.Second),
+		}
+	}
+
+	return m
+}
+
+// getAndCheckRetryInfoFromConfig gets the number of retries and the sleep time between retries from the configuration
+// for a particular worker type key in the configuration.  It then checks that the retry timeout is less than the
+// given duration.
+func getAndCheckRetryInfoFromConfig(wt worker.WorkerType, checkTimeout time.Duration) (numRetries int, retrySleep time.Duration, err error) {
+	numRetries = getWorkerConfigInteger[int](wt, "numRetries")
+	retrySleep = getWorkerConfigTimeDuration(wt, "retrySleep")
+	if err := checkRetryTimeout(numRetries, retrySleep, checkTimeout); err != nil {
+		msg := "timeout is less than the time it would take to retry all attempts.  Will stop now"
+		return 0, 0, errors.New(msg)
+	}
+	return numRetries, retrySleep, nil
 }

@@ -1,60 +1,111 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"testing"
-	"time"
 
-	"github.com/fermitools/managed-tokens/internal/worker"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/fermitools/managed-tokens/internal/db"
 )
 
-func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
-	tests := []struct {
-		name          string
-		workerType    worker.WorkerType
-		checkTimeout  time.Duration
-		numRetries    int
-		retrySleep    time.Duration
-		expectedError error
-	}{
+func TestGetDesiredUIDByOverrideOrLookup(t *testing.T) {
+	serviceConfigPath = "service_path"
+	tempDir := t.TempDir()
+
+	type testCase struct {
+		description       string
+		viperSetupFunc    func()
+		databaseSetupFunc func() *db.ManagedTokensDatabase
+		expectedUID       uint32
+		expectedError     error
+	}
+
+	testCases := []testCase{
 		{
-			name:          "Valid configuration",
-			workerType:    worker.GetKerberosTicketsWorkerType,
-			checkTimeout:  10 * time.Second,
-			numRetries:    3,
-			retrySleep:    2 * time.Second,
+			description: "Valid uid override",
+			viperSetupFunc: func() {
+				viper.Set(serviceConfigPath+".desiredUIDOverride", 123)
+			},
+			databaseSetupFunc: func() *db.ManagedTokensDatabase { return nil },
+			expectedUID:       123,
+			expectedError:     nil,
+		},
+		{
+			description:       "No valid database",
+			viperSetupFunc:    func() {},
+			databaseSetupFunc: func() *db.ManagedTokensDatabase { return nil },
+			expectedUID:       0,
+			expectedError:     errors.New("no valid database to read UID from"),
+		},
+		{
+			description: "Get UID from DB, error",
+			viperSetupFunc: func() {
+				viper.Set(serviceConfigPath+".account", "testaccount")
+			},
+			databaseSetupFunc: func() *db.ManagedTokensDatabase {
+				filename := tempDir + "/test_nodata.db"
+				d, err := db.OpenOrCreateDatabase(filename)
+				if err != nil {
+					panic("Could not open test database" + err.Error())
+				}
+				return d
+			},
+			expectedUID:   0,
+			expectedError: errors.New("could not get UID by username: sql: no rows in result set"),
+		},
+		{
+			description: "Get UID from DB, success",
+			viperSetupFunc: func() {
+				viper.Set(serviceConfigPath+".account", "testaccount")
+			},
+			databaseSetupFunc: func() *db.ManagedTokensDatabase {
+				filename := tempDir + "/test_populated.db"
+				d, err := db.OpenOrCreateDatabase(filename)
+				if err != nil {
+					panic("Could not open test database" + err.Error())
+				}
+				f := fakeFerryUIDDatum{"testaccount", 123}
+				err = d.InsertUidsIntoTableFromFERRY(context.Background(), []db.FerryUIDDatum{f})
+				if err != nil {
+					panic("Could not insert test data into database" + err.Error())
+				}
+				return d
+			},
+			expectedUID:   123,
 			expectedError: nil,
 		},
-		{
-			name:          "Invalid configuration - timeout less than retry duration",
-			workerType:    worker.GetKerberosTicketsWorkerType,
-			checkTimeout:  5 * time.Second,
-			numRetries:    3,
-			retrySleep:    2 * time.Second,
-			expectedError: errors.New("timeout is less than the time it would take to retry all attempts.  Will stop now"),
-		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
 			defer viper.Reset()
-			viper.Set("workerType."+workerTypeToConfigString(tt.workerType)+".numRetries", tt.numRetries)
-			viper.Set("workerType."+workerTypeToConfigString(tt.workerType)+".retrySleep", tt.retrySleep.String())
+			tc.viperSetupFunc()
+			uid, err := getDesiredUIDByOverrideOrLookup(context.Background(), serviceConfigPath, tc.databaseSetupFunc())
 
-			numRetries, retrySleep, err := getAndCheckRetryInfoFromConfig(tt.workerType, tt.checkTimeout)
-			if tt.expectedError != nil {
-				assert.EqualError(t, err, tt.expectedError.Error())
-				assert.Equal(t, 0, numRetries)
-				assert.Equal(t, time.Duration(0), retrySleep)
+			assert.Equal(t, tc.expectedUID, uid)
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
 				return
 			}
-
 			assert.NoError(t, err)
-			assert.Equal(t, tt.numRetries, numRetries)
-			assert.Equal(t, tt.retrySleep, retrySleep)
 		})
 	}
+}
+
+type fakeFerryUIDDatum struct {
+	username string
+	uid      int
+}
+
+func (f fakeFerryUIDDatum) Username() string {
+	return f.username
+}
+func (f fakeFerryUIDDatum) Uid() int {
+	return f.uid
+}
+func (f fakeFerryUIDDatum) String() string {
+	return "NOT IMPLEMENTED"
 }

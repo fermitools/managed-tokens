@@ -70,7 +70,7 @@ type Config struct {
 	// Then the caller should check ok to make sure it's true before using the value
 	Extras map[supportedExtrasKey]any
 	// workerSpecificConfig is a map of values that are specific to a worker type.  This is useful for setting values that are specific to a worker
-	workerSpecificConfig map[WorkerType]map[workerSpecificConfigOption]any
+	workerSpecificConfig map[WorkerType]map[WorkerSpecificConfigOption]any
 	environment.CommandEnvironment
 	*unPingableNodes // Pointer to an unPingableNodes object that indicates which configured nodes in Nodes do not respond to a ping request
 }
@@ -154,12 +154,12 @@ func (c *Config) IsNodeUnpingable(node string) bool {
 }
 
 // initializeWorkerSpecificConfigDefaults initializes and returns a map of default configuration values for each worker type.
-func initializeWorkerSpecificConfigDefaults() map[WorkerType]map[workerSpecificConfigOption]any {
-	m := make(map[WorkerType]map[workerSpecificConfigOption]any, 0)
+func initializeWorkerSpecificConfigDefaults() map[WorkerType]map[WorkerSpecificConfigOption]any {
+	m := make(map[WorkerType]map[WorkerSpecificConfigOption]any, 0)
 
 	for i := WorkerType(0); i < invalidWorkerType; i++ {
-		m[i] = make(map[workerSpecificConfigOption]any, 0)
-		m[i][numRetriesOption] = retryDefault
+		m[i] = make(map[WorkerSpecificConfigOption]any, 0)
+		m[i][NumRetriesOption] = retryDefault
 	}
 
 	return m
