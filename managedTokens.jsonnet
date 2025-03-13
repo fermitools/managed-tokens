@@ -1,4 +1,9 @@
-local exptConfig = import 'experimentConfig.libsonnet';
+local exptConfig = import 'libsonnet/experimentConfig.libsonnet';
+local ferryConfig = import 'libsonnet/ferryConfig.libsonnet';
+local timeoutsConfig = import 'libsonnet/timeoutsConfig.libsonnet';
+local emailConfig = import 'libsonnet/emailConfig.libsonnet';
+local obsConfig = import 'libsonnet/observability.libsonnet';
+local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
 
 {
     # Experiment config items
@@ -9,14 +14,12 @@ local exptConfig = import 'experimentConfig.libsonnet';
             role="production",
             account="dunepro",
             nodes=["dune01.fnal.gov", "dune02", "dune03"],
-            overrides={},
         ),
         mu2e: exptConfig.makeConfig(
             emails=["email2@example.com"],
             role="production",
             account="mu2epro",
             nodes=["mu2e01.fnal.gov", "mu2e02", "mu2e03"],
-            overrides={},
         ),
         // Configs with overrides
         "dune-2": exptConfig.makeConfig(
@@ -38,107 +41,41 @@ local exptConfig = import 'experimentConfig.libsonnet';
     },
 
     # Performance/timeouts
-    timeouts: {
-        globalTimeout: "300s",
-        kerberosTimeout: "20s",
-        vaultStorerTimeout: "60s",
-        pingTimeout: "10s",
-        pushTimeout: "30s",
-        ferryRequestTimeout: "30s",
-    },
-
+    timeouts: timeoutsConfig,
     minTokenLifetime: "3d", # If our vault token has less than this time left, get a new one
 
 
     # Worker-specific configurations
+    # Make changes using makeWorkerTypeConfig function
+    local makeWorkerTypeConfig(numRetries=0, retrySleep="0s") = {
+       numRetries: numRetries,
+       retrySleep: retrySleep,
+    },
     workerType: {
-        pushTokens: {
-            numRetries: 3,
-            retrySleep: "60s",
-        }
-    } + {
-        // All these use default configuration values
-        // of 0 retries
-        [x]: {
-            numRetries: 0,
-            retrySleep: "0s",
-        }
-        for x in [
-            "getKerberosTickets",
-            "storeAndGetToken",
-            "storeAndGetTokenInteractive",
-            "pingAggregator",
-        ]
+        pushTokens: makeWorkerTypeConfig(numRetries=3, retrySleep="60s"),
+        getKerberosTickets: makeWorkerTypeConfig(), // Uses default values
+        storeAndGetToken: makeWorkerTypeConfig(),
+        storeAndGetTokenInteractive: makeWorkerTypeConfig(),
+        pingAggregator: makeWorkerTypeConfig(),
     },
 
-
-    # FERRY config
-    ferry: {
-        host: "ferryhost.domain",
-        port: 8445,
-        caPath: "path/to/certificates",
-        hostCert: "/path/to/hostcert",
-        hostKey: "/path/to/hostkey",
-        serviceExperiment: "fermilab",
-        serviceRole:"",
-        serviceKerberosPrincipal: "/path/to/service_principal",
-        serviceKeytabPath: "/path/to/service_kerberos_keytab",
-        vaultServer: "vaultserver.domain",
-    },
-
-    # Email settings
-    email: {
-        from: "admin_email@example.com",
-        smtpHost: "localhost",
-        smtpPort: 25,
-    },
-
-    # Logfiles
-    logs: {
-        [x]: {
-            logfile: "/var/log/"+x+".log",
-            debugfile: "/var/log/"+x+".debug.log",
-        }
-        for x in [
-            "refresh-uids-from-ferry",
-            "token-push",
-        ]
-    },
-
-    # Prometheus settings
-    prometheus: {
-        host: "hostname.domain",
-        jobname: "managed_tokens",
-    },
-
-    # Loki settings
-    loki: {
-        host: "hostname.domain", # Required for loki use
-    },
-
-    # Tracing settings
-    tracing: {
-        url: "scheme://hostname.domain", # Required for tracing use
-    },
+    # Observability
+    logs: obsConfig.logs,
+    prometheus: obsConfig.prometheus,
+    loki: obsConfig.loki,
+    tracing: obsConfig.tracing,
 
     # Notifications
-    notifications: {
-        SLACK_ALERTS_URL: "https://hooks.slack.com/FILL_IN_URL_HERE",
-        admin_email: "admin@example.com",
-    },
+    email: emailConfig,
+    notifications: notificationsConfig.prod,
+    notifications_test: notificationsConfig.test,
 
-    # Same as above, but used in test runs
-    notifications_test: {
-        SLACK_ALERTS_URL: "https://hooks.slack.com/FILL_IN_URL_HERE",
-        admin_email: "admin@example.com",
-    },
-
+    ferry: ferryConfig,
 
     # Global config items that won't change as much
     keytabPath: "/opt/managed-tokens/keytabs",
     condorCollectorHost: "collectorhost.domain",
     condorScheddConstraint: "my_constraint",
-    vaultServer: "vaultserver.domain",
     serviceCreddVaultTokenPathRoot: "/var/lib/managed-tokens/service-credd-vault-tokens",
     kerberosPrincipalPattern: "principal_pattern",
     dbLocation: "/var/lib/managed-tokens/managed-tokens.db",
