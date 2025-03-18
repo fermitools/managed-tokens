@@ -69,6 +69,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
     email: emailConfig,
     notifications: notificationsConfig.prod,
     notifications_test: notificationsConfig.test,
+    errorCountToSendMessage: 3,
 
     ferry: ferryConfig,
 
@@ -79,7 +80,6 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
     serviceCreddVaultTokenPathRoot: "/var/lib/managed-tokens/service-credd-vault-tokens",
     kerberosPrincipalPattern: "principal_pattern",
     dbLocation: "/var/lib/managed-tokens/managed-tokens.db",
-    errorCountToSendMessage: 3,
     defaultRoleFileDestinationTemplate: "/tmp/{{.DesiredUID}}_{{.Account}}", # Any field in the worker.Config object is supported here,
     pingOptions: "--arg1 --arg2 value2", # Options to use with ping,
     fileCopierOptions: "--perms --chmod=u=r,go=", # Extra options to give to the fileCopier utility - usually rsync,
