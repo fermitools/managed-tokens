@@ -68,6 +68,11 @@ func TestGetWorkerConfigInteger(t *testing.T) {
 			expected:    42,
 		},
 		{
+			description: "Int that's typed as a float, but rounded down (very unlikely)",
+			testValue:   41.99999999999999,
+			expected:    42,
+		},
+		{
 			description: "Float that's not close to an int",
 			testValue:   42.5,
 			expected:    0,

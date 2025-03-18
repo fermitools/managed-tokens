@@ -78,8 +78,13 @@ func getWorkerConfigInteger[T constraints.Integer](wt worker.WorkerType, key str
 	case float64:
 		whole, frac = math.Modf(v)
 	}
+	// fractional part of v is within _eps of 0, like if float(42) is stored as 42.00000000000001
 	if frac < _eps {
 		return T(whole)
+	}
+	// fractional part of v is within _eps of 1, like if float(42) is stored as 41.99999999999999
+	if frac > (1 - _eps) {
+		return T(whole + 1)
 	}
 
 	return 0
