@@ -1,0 +1,10 @@
+sourcefile := managedTokens.jsonnet
+outfile := managedTokens.json
+
+.PHONY: clean
+
+$(outfile): $(sourcefile) libsonnet/*
+	jsonnet -o $@ $<
+
+clean: ${outfile}
+	rm $<

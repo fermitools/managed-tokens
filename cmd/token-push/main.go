@@ -278,7 +278,7 @@ func run(ctx context.Context) error {
 	// Worker-specific config that is service-independent to be passed to the worker.Config constructor
 	workerRetryMap, err := createWorkerRetryMap(timeouts)
 	if err != nil {
-		exeLogger.Error("Could not create worker retry map. Will run without retries")
+		exeLogger.Errorf("Could not create worker retry map: %s. Will run without retries", err)
 		workerRetryMap = setDefaultWorkerRetryMap()
 	}
 

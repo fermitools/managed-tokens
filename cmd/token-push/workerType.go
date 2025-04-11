@@ -16,8 +16,9 @@
 package main
 
 import (
-	"bytes"
+	"math"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -37,8 +38,8 @@ var validWorkerTypes = []worker.WorkerType{
 // workerTypeToConfigString converts a worker type to a string that the configuration uses
 func workerTypeToConfigString(wt worker.WorkerType) string {
 	s := wt.String()
-	first := bytes.ToLower([]byte(s[0:1]))
-	return string(first) + s[1:]
+	first := strings.ToLower(s[0:1])
+	return first + s[1:]
 }
 
 // getWorkerConfigValue retrieves the value of a worker-specific key from the configuration
@@ -67,6 +68,25 @@ func getWorkerConfigInteger[T constraints.Integer](wt worker.WorkerType, key str
 	if v, ok := val.(T); ok {
 		return v
 	}
+
+	// Some config formats like JSON store all ints as floats, so we need to see if we've got a int-like float
+	_epsilon := 1e-9 // Some super-small number
+	var whole, frac float64
+	switch v := val.(type) {
+	case float32:
+		whole, frac = math.Modf(float64(v))
+	case float64:
+		whole, frac = math.Modf(v)
+	}
+	// fractional part of v is within _epsilon of 0, like if float(42) is stored as 42.00000000000001
+	if frac < _epsilon {
+		return T(whole)
+	}
+	// fractional part of v is within _epsilon of 1, like if float(42) is stored as 41.99999999999999
+	if frac > (1 - _epsilon) {
+		return T(whole + 1)
+	}
+
 	return 0
 }
 

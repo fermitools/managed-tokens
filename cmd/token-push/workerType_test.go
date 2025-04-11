@@ -45,23 +45,59 @@ func TestGetWorkerConfigInteger(t *testing.T) {
 	workerType := worker.GetKerberosTicketsWorkerType
 	key := "myKey"
 
-	// Valid int
-	viper.Set("workerType."+workerTypeToConfigString(workerType)+"."+key, 42)
-	result := getWorkerConfigInteger[int](workerType, key)
-	assert.Equal(t, 42, result)
-	viper.Reset()
+	type testCase struct {
+		description string
+		testValue   any
+		expected    any
+	}
 
-	// Valid uint
-	viper.Set("workerType."+workerTypeToConfigString(workerType)+"."+key, uint(42))
-	result2 := getWorkerConfigInteger[uint](workerType, key)
-	assert.Equal(t, uint(42), result2)
-	viper.Reset()
+	testCases := []testCase{
+		{
+			description: "Valid int",
+			testValue:   42,
+			expected:    42,
+		},
+		{
+			description: "Valid uint",
+			testValue:   uint(42),
+			expected:    uint(42),
+		},
+		{
+			description: "Int that's typed as a float",
+			testValue:   42.0,
+			expected:    42,
+		},
+		{
+			description: "Int that's typed as a float, but rounded down (very unlikely)",
+			testValue:   41.99999999999999,
+			expected:    42,
+		},
+		{
+			description: "Float that's not close to an int",
+			testValue:   42.5,
+			expected:    0,
+		},
+		{
+			description: "Not an int",
+			testValue:   "invalidInteger",
+			expected:    0,
+		},
+	}
 
-	// Not an int
-	viper.Set("workerType."+workerTypeToConfigString(workerType)+"."+key, "invalidInteger")
-	result3 := getWorkerConfigInteger[int](workerType, key)
-	assert.Equal(t, 0, result3)
-	viper.Reset()
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			defer viper.Reset()
+			viper.Set("workerType."+workerTypeToConfigString(workerType)+"."+key, tc.testValue)
+			var result any
+			if _, ok := tc.testValue.(uint); ok {
+				result = getWorkerConfigInteger[uint](workerType, key)
+			} else {
+				result = getWorkerConfigInteger[int](workerType, key)
+			}
+			assert.Equal(t, tc.expected, result)
+		},
+		)
+	}
 }
 
 func TestGetWorkerConfigString(t *testing.T) {
