@@ -11,31 +11,82 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
         // Minimum-required configs
         dune: exptConfig.makeConfig(
             emails=["email1@example.com"],
-            role="production",
-            account="dunepro",
-            nodes=["dune01.fnal.gov", "dune02", "dune03"],
+            roleConfigs={
+                "production": exptConfig.makeRoleConfig(
+                    account="dunepro",
+                    nodes=["dune01", "dune02", "dune03"],
+                ),
+            }
         ),
         mu2e: exptConfig.makeConfig(
             emails=["email2@example.com"],
-            role="production",
-            account="mu2epro",
-            nodes=["mu2e01.fnal.gov", "mu2e02", "mu2e03"],
+            roleConfigs={
+                "production": exptConfig.makeRoleConfig(
+                    account="mu2epro",
+                    nodes=["mu2e01", "mu2e02", "mu2e03"],
+                ),
+            }
+        ),
+        // Configs with multiple roles
+        "sbnd": exptConfig.makeConfig(
+            emails=["email1@example.com"],
+            roleConfigs={
+                "production": exptConfig.makeRoleConfig(
+                    account="sbndpro",
+                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                ),
+                "testrole": exptConfig.makeRoleConfig(
+                    account="sbndtestrole",
+                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                ),
+            }
         ),
         // Configs with overrides
         "dune-2": exptConfig.makeConfig(
             emails=["email1@example.com"],
-            role="production",
-            account="dunepro",
-            nodes=["dune01.fnal.gov", "dune02", "dune03"],
-            overrides={
-                experimentOverride: "dune",
-                keytabPathOverride: "/special/path/to/keytab",
-                userPrincipalOverride: "dunepro/kerberos/principal@REALM",
-                desiredUIDOverride: 12345,
-                condorCreddHostOverride: "specialcreddhost.domain",
-                condorCollectorHostOverride: "specialcollectorhost.domain",
-                defaultRoleFileDestinationTemplateOverride: "/tmp/{{.DesiredUID}}_{{.Account}}",  # Any field in the worker.Config object is supported here
-                disableNotificationsOverride: false, # If true, no notifications will be sent for this role
+            experimentOverride="dune",
+            roleConfigs={
+                "production": exptConfig.makeRoleConfig(
+                    account="dunepro",
+                    nodes=["dune01", "dune02", "dune03"],
+                    overrides={
+                        experimentOverride: "dune",
+                        keytabPathOverride: "/special/path/to/keytab",
+                        userPrincipalOverride: "dunepro/kerberos/principal@REALM",
+                        desiredUIDOverride: 12345,
+                        condorCreddHostOverride: "specialcreddhost.domain",
+                        condorCollectorHostOverride: "specialcollectorhost.domain",
+                        defaultRoleFileDestinationTemplateOverride: "/tmp/{{.DesiredUID}}_{{.Account}}",  # Any field in the worker.Config object is supported here
+                        disableNotificationsOverride: false, # If true, no notifications will be sent for this role
+                    },
+                ),
+            },
+        ),
+        // Config with experiment-level overrides and role-level overrides:
+        "sbnd-2": exptConfig.makeConfig(
+            emails=["email2@example.com"],
+            experimentOverride="sbnd",
+            otherOverrides = {
+                disableNotificationsOverride: true, # If true, no notifications will be sent for this role
+            },
+            roleConfigs={
+                "production": exptConfig.makeRoleConfig(
+                    account="sbndpro",
+                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                    overrides={
+                        keytabPathOverride: "/special/path/to/keytab",
+                        userPrincipalOverride: "sbndpro/kerberos/principal@REALM",
+                        desiredUIDOverride: 12345,
+                        condorCreddHostOverride: "specialcreddhost.domain",
+                        condorCollectorHostOverride: "specialcollectorhost.domain",
+                        defaultRoleFileDestinationTemplateOverride: "/tmp/{{.DesiredUID}}_{{.Account}}",  # Any field in the worker.Config object is supported here
+                        disableNotificationsOverride: false, # If true, no notifications will be sent for this role
+                    },
+                ),
+                "testrole": exptConfig.makeRoleConfig(
+                    account="sbndtest",
+                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                ),
             },
         ),
     },
