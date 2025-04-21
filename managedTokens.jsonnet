@@ -14,7 +14,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
             roleConfigs={
                 "production": exptConfig.makeRoleConfig(
                     account="dunepro",
-                    nodes=["dune01", "dune02", "dune03"],
+                    destinationNodes=["dune01", "dune02", "dune03"],
                 ),
             }
         ),
@@ -23,7 +23,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
             roleConfigs={
                 "production": exptConfig.makeRoleConfig(
                     account="mu2epro",
-                    nodes=["mu2e01", "mu2e02", "mu2e03"],
+                    destinationNodes=["mu2e01", "mu2e02", "mu2e03"],
                 ),
             }
         ),
@@ -33,11 +33,11 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
             roleConfigs={
                 "production": exptConfig.makeRoleConfig(
                     account="sbndpro",
-                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                    destinationNodes=["sbnd01", "sbnd02", "sbnd03"],
                 ),
                 "testrole": exptConfig.makeRoleConfig(
                     account="sbndtestrole",
-                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                    destinationNodes=["sbnd01", "sbnd02", "sbnd03"],
                 ),
             }
         ),
@@ -48,7 +48,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
             roleConfigs={
                 "production": exptConfig.makeRoleConfig(
                     account="dunepro",
-                    nodes=["dune01", "dune02", "dune03"],
+                    destinationNodes=["dune01", "dune02", "dune03"],
                     overrides={
                         experimentOverride: "dune",
                         keytabPathOverride: "/special/path/to/keytab",
@@ -72,7 +72,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
             roleConfigs={
                 "production": exptConfig.makeRoleConfig(
                     account="sbndpro",
-                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                    destinationNodes=["sbnd01", "sbnd02", "sbnd03"],
                     overrides={
                         keytabPathOverride: "/special/path/to/keytab",
                         userPrincipalOverride: "sbndpro/kerberos/principal@REALM",
@@ -85,7 +85,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
                 ),
                 "testrole": exptConfig.makeRoleConfig(
                     account="sbndtest",
-                    nodes=["sbnd01", "sbnd02", "sbnd03"],
+                    destinationNodes=["sbnd01", "sbnd02", "sbnd03"],
                 ),
             },
         ),

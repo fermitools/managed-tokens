@@ -35,9 +35,9 @@ local supportedOverrides = [
     // given by the caller against the supported overrides
     //
     // This is the recommended way to create roleConfig objects
-    makeRoleConfig(account, nodes, overrides={}): {
+    makeRoleConfig(account, destinationNodes, overrides={}): {
             account: account,
-            destinationNodes: nodes,
+            destinationNodes: destinationNodes,
     } + {
             [ov]: overrides[ov],
             for ov in std.objectFields(overrides)
