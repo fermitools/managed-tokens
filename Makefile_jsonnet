@@ -1,10 +1,17 @@
 sourcefile := managedTokens.jsonnet
 outfile := managedTokens.json
+testfile := managedTokens_test.jsonnet
 
-.PHONY: clean
+.PHONY: clean test
 
 $(outfile): $(sourcefile) libsonnet/*
 	jsonnet -o $@ $<
+
+test:  libsonnet/*.libsonnet libsonnet/jsonnetunit libsonnet/*.jsonnet
+	jsonnet -J libsonnet/jsonnetunit  $(testfile)
+	cd libsonnet; \
+	jsonnet -J jsonnetunit *.jsonnet
+
 
 clean: ${outfile}
 	rm $<
