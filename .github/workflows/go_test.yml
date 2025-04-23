@@ -22,7 +22,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.22'
+        go-version: ${{ vars.ACTION_GOVERSION }}
 
     - name: Populate vendor dir
       run: go mod vendor
