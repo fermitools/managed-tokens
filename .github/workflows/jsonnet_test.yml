@@ -1,0 +1,38 @@
+# This workflow will run the jsonnet tests
+
+name: Jsonnet build and test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+    CI: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v3
+        - uses: ./.github/actions/setup-jsonnet-and-go
+
+        - name: Render json from jsonnet file
+          run: make -f Makefile_jsonnet
+
+    test:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v3
+        - uses: ./.github/actions/setup-jsonnet-and-go
+
+        - name: Download jsonnetunit
+          uses: actions/checkout@v3
+          with:
+            repository: yugui/jsonnetunit
+            path: libsonnet/jsonnetunit
+
+        - name: Run jsonnet tests
+          run: make -f Makefile_jsonnet test

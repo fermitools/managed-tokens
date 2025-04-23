@@ -1,0 +1,12 @@
+name: "Set up go and jsonnet"
+description: "This action sets up Go and jsonnet"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v4
+      with:
+        go-version: ${{ vars.ACTION_GOVERSION }}
+
+    - name: Set up jsonnet
+      shell: bash
+      run: go install github.com/google/go-jsonnet/cmd/jsonnet@latest

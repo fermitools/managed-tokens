@@ -1,10 +1,27 @@
 sourcefile := managedTokens.jsonnet
 outfile := managedTokens.json
+libsonnet_dir := libsonnet
+libsonnet_files := $(wildcard $(libsonnet_dir)/*.libsonnet)
 
-.PHONY: clean
+# Tests
+testfile := managedTokens_test.jsonnet
+jsonnetunit_dir := $(libsonnet_dir)/jsonnetunit
+libsonnet_test_files := $(wildcard $(libsonnet_dir)/*.jsonnet)
 
-$(outfile): $(sourcefile) libsonnet/*
+.PHONY: clean test test_top_level test_libsonnet
+
+$(outfile): $(sourcefile) $(libsonnet_files)
 	jsonnet -o $@ $<
+
+all: test $(outfile)
+
+test: test_top_level test_libsonnet
+
+test_top_level:  $(testfile) $(libsonnet_files) $(jsonnetunit_dir)
+	jsonnet -J $(jsonnetunit_dir) $<
+
+test_libsonnet: $(libsonnet_test_files) $(libsonnet_files) $(jsonnetunit_dir)
+	jsonnet -J $(jsonnetunit_dir) $<
 
 clean: ${outfile}
 	rm $<
