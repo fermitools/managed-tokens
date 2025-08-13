@@ -6,6 +6,7 @@ local supportedOverrides = [
     "desiredUIDOverride",
     "condorCreddHostOverride",
     "condorCollectorHostOverride",
+    "condorScheddConstraintOverride",
     "defaultRoleFileDestinationTemplateOverride",
     "disableNotificationsOverride",
 ];
