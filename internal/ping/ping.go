@@ -96,7 +96,7 @@ func parseAndExecutePingTemplate(node string, extraPingOpts []string) ([]string,
 		log.WithFields(log.Fields{
 			"extraPingOpts": extraPingOpts,
 			"node":          node,
-		}).Errorf(msg)
+		}).Error(msg)
 		return nil, errors.New("msg")
 	}
 	finalPingOpts := strings.Join(mergedPingOpts, " ")

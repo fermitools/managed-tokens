@@ -1,8 +1,6 @@
 module github.com/fermitools/managed-tokens
 
-go 1.22.0
-
-toolchain go1.22.2
+go 1.24.3
 
 require (
 	github.com/cornfeedhobo/pflag v1.1.0

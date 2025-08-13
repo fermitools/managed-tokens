@@ -547,7 +547,7 @@ func run(ctx context.Context) error {
 		for _, datum := range ferryData {
 			ferryDataStringSlice = append(ferryDataStringSlice, datum.String())
 		}
-		exeLogger.Infof(strings.Join(ferryDataStringSlice, "; "))
+		exeLogger.Info(strings.Join(ferryDataStringSlice, "; "))
 
 		exeLogger.Info("Test mode finished")
 		return nil

@@ -163,7 +163,7 @@ func (m *ManagedTokensDatabase) checkApplicationId() error {
 	// Make sure our application IDs match
 	if dbApplicationId != ApplicationId {
 		errMsg := fmt.Sprintf("Application IDs do not match.  Got %d, expected %d", dbApplicationId, ApplicationId)
-		funcLog.Errorf(errMsg)
+		funcLog.Error(errMsg)
 		return &databaseCheckError{errMsg, nil}
 	}
 	return nil
