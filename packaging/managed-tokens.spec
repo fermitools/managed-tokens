@@ -13,9 +13,10 @@ Source0:        %{name}-%{version}.tar.gz
 BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-XXXXXX)
 BuildArch:      x86_64
 
-Requires:       krb5-workstation
 Requires:       condor
 Requires:       condor-credmon-vault
+Requires:       jsonnet
+Requires:       krb5-workstation
 Requires:       iputils
 Requires:       rsync
 Requires:       sqlite
@@ -34,10 +35,21 @@ rm -rf %{buildroot}
 
 %install
 
-# Config file to /etc/managed-tokens
+# JSONNET/Libsonnet Config files, to /etc/managed-tokens
 mkdir -p %{buildroot}/%{_sysconfdir}/%{name}
-install -m 0774 managedTokens.yml %{buildroot}/%{_sysconfdir}/%{name}/managedTokens.yml
+mkdir -p %{buildroot}/%{_sysconfdir}/%{name}/libsonnet
 
+# libsonnet files
+for file in $(ls -1 libsonnet/*!(_test).libsonnet); do
+    install -m 0774 ${file} %{buildroot}/%{_sysconfdir}/%{name}/${file}  # Will be something like /etc/managed-tokens/libsonnet/myfile.libsonnet
+done
+
+# Main jsonnet file
+install -m 0774 managedTokens.jsonnet %{buildroot}/%{_sysconfdir}/%{name}/managedTokens.jsonnet
+# Makefile_jsonnet will be installed to /etc/managed-tokens/Makefile
+install -m 0774 Makefile_jsonnet %{buildroot}/%{_sysconfdir}/%{name}/Makefile
+
+###
 # Executables to /usr/bin
 mkdir -p %{buildroot}/%{_bindir}
 install -m 0755 refresh-uids-from-ferry %{buildroot}/%{_bindir}/refresh-uids-from-ferry
@@ -56,16 +68,22 @@ rm -rf %{buildroot}
 %files
 %defattr(0755, rexbatch, fife, 0774)
 %{_sysconfdir}/%{name}
-%config(noreplace) %{_sysconfdir}/%{name}/managedTokens.yml
+%{_sysconfdir}/%{name}/libsonnet
+%config(noreplace) %{_sysconfdir}/%{name}/managedTokens.jsonnet
+%config(noreplace) %{_sysconfdir}/%{name}/Makefile
+%config(noreplace) %{_sysconfdir}/%{name}/libsonnet/*.libsonnet
 %config(noreplace) %attr(0644, root, root) %{_sysconfdir}/cron.d/%{name}
 %config(noreplace) %attr(0644, root, root) %{_sysconfdir}/logrotate.d/%{name}
 %{_bindir}/refresh-uids-from-ferry
 %{_bindir}/token-push
 
 %post
-# Set owner of /etc/managed-tokens
+# Set owner of /etc/managed-tokens and /etc/managed-tokens/libsonnet
 test -d %{_sysconfdir}/%{name} && {
 chown rexbatch:fife %{_sysconfdir}/%{name}
+}
+test -d %{_sysconfdir}/%{name}/libsonnet && {
+chown rexbatch:fife %{_sysconfdir}/%{name}/libsonnet
 }
 
 # Logfiles at /var/log/managed-tokens
@@ -84,6 +102,11 @@ install -d %{_sharedstatedir}/%{name}/service-credd-vault-tokens -m 0774 -o rexb
 }
 
 %changelog
+* Wed Aug 13 2025 Shreyas Bhat <sbhat@fnal.gov> - 0.17
+- Added jsonnet dependency
+- Removed /etc/managed-tokens/managedTokens.yml from spec
+- Added /etc/managed-tokens/managedTokens.jsonnet, /etc/managed-tokens/Makefile, and /etc/managed-tokens/libsonnet/ to spec
+
 * Fri Dec 13 2024 Shreyas Bhat <sbhat@fnal.gov> - 0.16
 - Removed run-onboarding-managed-tokens executable from RPM
 
