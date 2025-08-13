@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -49,7 +50,6 @@ import (
 var (
 	currentExecutable       string
 	buildTimestamp          string // Should be injected at build time with something like go build -ldflags="-X main.buildTimeStamp=$BUILDTIMESTAMP"
-	version                 string // Should be injected at build time with something like go build -ldflags="-X main.version=$VERSION"
 	exeLogger               *log.Entry
 	notificationsDisabledBy disableNotificationsOption = DISABLED_BY_CONFIGURATION
 )
@@ -111,8 +111,20 @@ func setup() error {
 
 	initFlags() // Parse our flags
 
-	versionMessage := fmt.Sprintf("Managed tokens library version %s, build %s", version, buildTimestamp)
+	var versionMessage string
 	if viper.GetBool("version") {
+		buildInfo, ok := debug.ReadBuildInfo()
+		noVersionError := errors.New("could not read version info from binary")
+		if !ok {
+			setupLogger.Error(noVersionError)
+			return noVersionError
+		}
+		version := buildInfo.Main.Version
+		if version == "" {
+			setupLogger.Error(noVersionError)
+			return noVersionError
+		}
+		versionMessage = fmt.Sprintf("Managed tokens library version %s, build %s", version, buildTimestamp)
 		fmt.Println(versionMessage)
 		return errExitOK
 	}
