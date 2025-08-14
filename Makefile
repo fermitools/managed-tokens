@@ -46,7 +46,7 @@ build:
 	for exe in $(executables); do \
 		echo "Building $$exe"; \
 		cd cmd/$$exe;\
-		go build $(raceflag) -ldflags="-X main.buildTimestamp=$(BUILD) -X main.version=$(VERSION)";  \
+		go build $(raceflag) -ldflags="-X main.buildTimestamp=$(BUILD)";  \
 		echo "Built $$exe"; \
 		cd $(ROOTDIR); \
 	done
