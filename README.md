@@ -4,9 +4,9 @@
 
 
 # managed-tokens
-Managed Tokens service for Condor/Hashicorp Vault Token Distribution
+Managed Tokens service for Condor/Hashicorp Vault/OpenBao Service Token Distribution
 
-The Managed Tokens Service stores and distributes HashiCorp Vault tokens for stakeholders to use in their automated grid computing activities. Specifically, the Managed Tokens service enables stakeholders to automate grid activities such as job submission and file transfers by ensuring that the valid credentials (Vault Tokens) always exist on submit nodes, ready to be used.
+The Managed Tokens Service stores and distributes HashiCorp Vault/OpenBao Service tokens for stakeholders to use in their automated grid computing activities. Specifically, the Managed Tokens service enables stakeholders to automate grid activities such as job submission and file transfers by ensuring that the valid credentials (Vault Tokens) always exist on submit nodes, ready to be used.
 
 # Executables
 The Managed Tokens Service consists of two executables:
