@@ -28,7 +28,7 @@ import (
 )
 
 // This test verifies that the proper routing is done.  We check for the error logged by the actual notifications.email.sendMessage() call, to make sure
-// that a message was attempted to be sent. It's not as thorough as a test as I'd like at the moment, but it's better than nothing
+// that a message was attempted to be sent. It's not as thorough a test as I'd like at the moment, but it's better than nothing
 func TestNotificationsManagerSendsMessage(t *testing.T) {
 	// TODO:  We can test the case where we have no messages if we encapsulate the global routing chans into a type. Right now, the cleanup funcs at the
 	// end close all the routing channels, so we can't reuse them
