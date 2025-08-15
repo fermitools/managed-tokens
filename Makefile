@@ -39,7 +39,7 @@ spec:
 tarball: build
 	mkdir -p $(SOURCEDIR)
 	mkdir -p $(SOURCEDIR)/libsonnet
-	cp $(foreach exe,$(executables),$(exe)) $(SOURCEDIR)  # Executables
+	cp $(foreach exe,$(executables),$(ROOTDIR)/$(exe)) $(SOURCEDIR)  # Executables
 	cp $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/packaging/managed-tokens.logrotate $(ROOTDIR)/packaging/managed-tokens.cron $(SOURCEDIR)  # Config files
 	cp $(foreach lsfile,$(libsonnetFiles),$(lsfile)) $(SOURCEDIR)/libsonnet/$(notdir $(lsfile)) # Libsonnet files
 	tar -czf $(buildTarPath) -C $(ROOTDIR) $(buildTarName)
