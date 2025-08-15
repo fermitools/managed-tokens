@@ -40,7 +40,7 @@ mkdir -p %{buildroot}/%{_sysconfdir}/%{name}
 mkdir -p %{buildroot}/%{_sysconfdir}/%{name}/libsonnet
 
 # libsonnet files
-for file in $(ls -1 libsonnet/*!(_test).libsonnet); do
+for file in `find libsonnet/ -name '*.libsonnet' -type f`; do
     install -m 0774 ${file} %{buildroot}/%{_sysconfdir}/%{name}/${file}  # Will be something like /etc/managed-tokens/libsonnet/myfile.libsonnet
 done
 
