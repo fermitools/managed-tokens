@@ -7,6 +7,8 @@ buildTarName = $(NAME)-$(rpmVersion)
 buildTarPath = $(ROOTDIR)/$(buildTarName).tar.gz
 SOURCEDIR = $(ROOTDIR)/$(buildTarName)
 executables = refresh-uids-from-ferry token-push
+libsonnetDir = $(ROOTDIR)/libsonnet
+libsonnetFiles = $(shell find $(libsonnetDir) -name '*.libsonnet' -maxdepth 1 -type f)
 specfile := $(ROOTDIR)/packaging/$(NAME).spec
 ifdef RACE
 raceflag := -race
@@ -36,8 +38,10 @@ spec:
 
 tarball: build
 	mkdir -p $(SOURCEDIR)
-	cp $(foreach exe,$(executables),cmd/$(exe)/$(exe)) $(SOURCEDIR)  # Executables
-	cp $(ROOTDIR)/managedTokens.yml $(ROOTDIR)/packaging/managed-tokens.logrotate $(ROOTDIR)/packaging/managed-tokens.cron $(SOURCEDIR)  # Config files
+	mkdir -p $(SOURCEDIR)/libsonnet
+	cp $(foreach exe,$(executables),$(ROOTDIR)/$(exe)) $(SOURCEDIR)  # Executables
+	cp $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/packaging/managed-tokens.logrotate $(ROOTDIR)/packaging/managed-tokens.cron $(SOURCEDIR)  # Config files
+	cp $(foreach lsfile,$(libsonnetFiles),$(lsfile)) $(SOURCEDIR)/libsonnet/$(notdir $(lsfile)) # Libsonnet files
 	tar -czf $(buildTarPath) -C $(ROOTDIR) $(buildTarName)
 	echo "Built deployment tarball"
 
@@ -46,7 +50,7 @@ build:
 	for exe in $(executables); do \
 		echo "Building $$exe"; \
 		cd cmd/$$exe;\
-		go build $(raceflag) -ldflags="-X main.buildTimestamp=$(BUILD)";  \
+		go build $(raceflag) -ldflags="-X main.buildTimestamp=$(BUILD)" -o $(ROOTDIR)/$$exe;  \
 		echo "Built $$exe"; \
 		cd $(ROOTDIR); \
 	done
