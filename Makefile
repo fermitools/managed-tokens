@@ -60,8 +60,8 @@ $(buildTarPath): $(executables) $(ROOTDIR)/libsonnet $(ROOTDIR)/Makefile_jsonnet
 $(NAME)-$(rpmVersion)*.rpm: rpmSourcesDir := $$HOME/rpmbuild/SOURCES
 $(NAME)-$(rpmVersion)*.rpm: rpmSpecsDir := $$HOME/rpmbuild/SPECS
 $(NAME)-$(rpmVersion)*.rpm: rpmDir := $$HOME/rpmbuild/RPMS/x86_64/
-$(NAME)-$(rpmVersion)*.rpm: spec $(buildTarPath)
-	cp $(specfile) $(rpmSpecsDir)/
+$(NAME)-$(rpmVersion)*.rpm: $(specfile) $(buildTarPath)
+	cp $< $(rpmSpecsDir)/
 	cp $(buildTarPath) $(rpmSourcesDir)/
 	cd $(rpmSpecsDir); \
 	rpmbuild -ba ${NAME}.spec
@@ -69,8 +69,7 @@ $(NAME)-$(rpmVersion)*.rpm: spec $(buildTarPath)
 	echo "Created RPM and copied it to current working directory"
 
 podman-test: all
-    rpmfile := $(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
-	podman build -t managed-tokens-test . --build-arg=rpmfile=$(rpmfile)
+	podman build -t managed-tokens-test . --build-arg=rpmfile=$(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
 	podman run --rm managed-tokens-test
 	echo "Docker test completed"
 
