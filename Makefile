@@ -54,6 +54,9 @@ tarball: build
 	cp $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/packaging/managed-tokens.logrotate $(ROOTDIR)/packaging/managed-tokens.cron $(SOURCEDIR)  # Config files
 	cp $(foreach lsfile,$(libsonnetFiles),$(lsfile)) $(SOURCEDIR)/libsonnet/$(notdir $(lsfile)) # Libsonnet files
 	tar -czf $(buildTarPath) -C $(ROOTDIR) $(buildTarName)
+	ifndef DEBUG
+		(test -e $(SOURCEDIR)) && (rm -Rf $(SOURCEDIR))
+	endif
 	echo "Built deployment tarball"
 
 
@@ -66,6 +69,10 @@ rpm: spec tarball
 	cd $(rpmSpecsDir); \
 	rpmbuild -ba ${NAME}.spec
 	find $$HOME/rpmbuild/RPMS -type f -name "$(NAME)-$(rpmVersion)*.rpm" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
+	ifndef DEBUG
+		(test -e $(buildTarPath)) && (rm $(buildTarPath))
+		(test -e $(rpmSourcesDir)/$(buildTarName).tar.gz) && (rm $(rpmSourcesDir)/$(buildTarName).tar.gz)
+	endif
 	echo "Created RPM and copied it to current working directory"
 
 
@@ -77,6 +84,7 @@ git-revert-tag:
 clean:
 	(test -e $(buildTarPath)) && (rm $(buildTarPath))
 	(test -e $(SOURCEDIR)) && (rm -Rf $(SOURCEDIR))
+	(test -e $(rpmSourcesDir)/$(buildTarName).tar.gz) && (rm $(rpmSourcesDir)/$(buildTarName).tar.gz)
 
 
 clean-all: clean git-revert-tag
