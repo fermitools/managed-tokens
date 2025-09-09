@@ -22,8 +22,9 @@ signflagCommit :=
 endif
 
 
-all: spec git-tag build tarball rpm
-.PHONY: all spec git-tag build tarball rpm git-revert-tag clean clean-all
+all: spec git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
+all-test: all podman-test
+.PHONY: all all-test spec git-tag git-revert-tag clean clean-all
 
 
 spec:
@@ -37,7 +38,7 @@ git-tag: spec
 	git tag $(VERSION)
 
 
-build:
+$(executables): cmd/*/*.go internal/*/*.go
 	for exe in $(executables); do \
 		echo "Building $$exe"; \
 		cd cmd/$$exe;\
@@ -47,37 +48,29 @@ build:
 	done
 
 
-tarball: build
+$(buildTarPath): $(executables) $(ROOTDIR)/libsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/packaging/*
 	mkdir -p $(SOURCEDIR)
 	mkdir -p $(SOURCEDIR)/libsonnet
 	cp $(foreach exe,$(executables),$(ROOTDIR)/$(exe)) $(SOURCEDIR)  # Executables
 	cp $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/packaging/managed-tokens.logrotate $(ROOTDIR)/packaging/managed-tokens.cron $(SOURCEDIR)  # Config files
 	cp $(foreach lsfile,$(libsonnetFiles),$(lsfile)) $(SOURCEDIR)/libsonnet/$(notdir $(lsfile)) # Libsonnet files
 	tar -czf $(buildTarPath) -C $(ROOTDIR) $(buildTarName)
-	ifndef DEBUG
-		(test -e $(SOURCEDIR)) && (rm -Rf $(SOURCEDIR))
-	endif
 	echo "Built deployment tarball"
 
 
-rpm: rpmSourcesDir := $$HOME/rpmbuild/SOURCES
-rpm: rpmSpecsDir := $$HOME/rpmbuild/SPECS
-rpm: rpmDir := $$HOME/rpmbuild/RPMS/x86_64/
-rpm: spec tarball
+$(NAME)-$(rpmVersion)*.rpm: rpmSourcesDir := $$HOME/rpmbuild/SOURCES
+$(NAME)-$(rpmVersion)*.rpm: rpmSpecsDir := $$HOME/rpmbuild/SPECS
+$(NAME)-$(rpmVersion)*.rpm: rpmDir := $$HOME/rpmbuild/RPMS/x86_64/
+$(NAME)-$(rpmVersion)*.rpm: spec $(buildTarPath)
 	cp $(specfile) $(rpmSpecsDir)/
 	cp $(buildTarPath) $(rpmSourcesDir)/
 	cd $(rpmSpecsDir); \
 	rpmbuild -ba ${NAME}.spec
-	find $$HOME/rpmbuild/RPMS -type f -name "$(NAME)-$(rpmVersion)*.rpm" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
-	ifndef DEBUG
-		(test -e $(buildTarPath)) && (rm $(buildTarPath))
-		(test -e $(rpmSourcesDir)/$(buildTarName).tar.gz) && (rm $(rpmSourcesDir)/$(buildTarName).tar.gz)
-	endif
+	find $(HOME)/rpmbuild/RPMS -type f -name "$(NAME)-$(rpmVersion)*.rpm" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
 	echo "Created RPM and copied it to current working directory"
 
-podman-test: rpm
-	rpmFile := $(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
-	podman build -t managed-tokens-test . --build-arg=RPMFILE=$(rpmFile)
+podman-test: $(NAME)-$(rpmVersion)*.rpm
+	podman build -t managed-tokens-test . --build-arg=rpmfile=$^
 	podman run --rm managed-tokens-test
 	echo "Docker test completed"
 
@@ -86,11 +79,14 @@ git-revert-tag:
 	git reset --hard HEAD~1
 	echo "Reverted git tag and commit for version $(VERSION)"
 
+clean: rpmSourcesDir := $$HOME/rpmbuild/SOURCES
 clean:
+	for exe in $(executables); do \
+		(test -e $(ROOTDIR)/$$exe) && (rm $(ROOTDIR)/$$exe); \
+	done
 	(test -e $(buildTarPath)) && (rm $(buildTarPath))
 	(test -e $(SOURCEDIR)) && (rm -Rf $(SOURCEDIR))
 	(test -e $(rpmSourcesDir)/$(buildTarName).tar.gz) && (rm $(rpmSourcesDir)/$(buildTarName).tar.gz)
-
 
 clean-all: clean git-revert-tag
 	(test -e $(ROOTDIR)/$(NAME)-$(rpmVersion)*.rpm) && (rm $(ROOTDIR)/$(NAME)-$(rpmVersion)*.rpm)
