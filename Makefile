@@ -22,17 +22,16 @@ signflagCommit :=
 endif
 
 
-all: spec git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
-all-test: all podman-test
-.PHONY: all all-test spec git-tag git-revert-tag clean clean-all
+all: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
+.PHONY: all all-test git-tag git-revert-tag clean clean-all
 
 
-spec:
+$(specfile): Makefile
 	sed -Ei 's/Version\:[ ]*.+/Version:        $(rpmVersion)/' $(specfile)
 	echo "Set version in spec file to $(rpmVersion)"
 
 
-git-tag: spec
+git-tag: $(specfile)
 	git add Makefile $(specfile)
 	git commit $(signflagCommit) -m 'Release $(VERSION)'
 	git tag $(VERSION)
@@ -69,8 +68,9 @@ $(NAME)-$(rpmVersion)*.rpm: spec $(buildTarPath)
 	find $(HOME)/rpmbuild/RPMS -type f -name "$(NAME)-$(rpmVersion)*.rpm" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
 	echo "Created RPM and copied it to current working directory"
 
-podman-test: $(NAME)-$(rpmVersion)*.rpm
-	podman build -t managed-tokens-test . --build-arg=rpmfile=$^
+podman-test: all
+    rpmfile := $(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
+	podman build -t managed-tokens-test . --build-arg=rpmfile=$(rpmfile)
 	podman run --rm managed-tokens-test
 	echo "Docker test completed"
 
