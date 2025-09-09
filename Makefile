@@ -75,6 +75,11 @@ rpm: spec tarball
 	endif
 	echo "Created RPM and copied it to current working directory"
 
+podman-test: rpm
+	rpmFile := $(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
+	podman build -t managed-tokens-test . --build-arg=RPMFILE=$(rpmFile)
+	podman run --rm managed-tokens-test
+	echo "Docker test completed"
 
 git-revert-tag:
 	git tag -d $(VERSION)
