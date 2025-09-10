@@ -70,8 +70,7 @@ $(NAME)-$(rpmVersion)*.rpm: $(specfile) $(buildTarPath)
 
 podman-test: all
 	podman build -t managed-tokens-test . --build-arg=rpmfile=$(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
-	podman run --rm managed-tokens-test
-	echo "Docker test completed"
+	[ "$(podman run --rm managed-tokens-test | grep -oP "Managed tokens library version \Kv[0-9]\.[0-9]+\.[0-9]+(?=,.*))" = "$(VERSION)" ] && echo "Podman test passed" || (echo "Podman test failed)
 
 git-revert-tag:
 	git tag -d $(VERSION)
