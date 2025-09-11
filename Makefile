@@ -71,7 +71,7 @@ $(NAME)-$(rpmVersion)*.rpm: $(specfile) $(buildTarPath)
 	find $(HOME)/rpmbuild/RPMS -type f -name "$(NAME)-$(rpmVersion)*.rpm" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
 	echo "Created RPM and copied it to current working directory"
 
-podman-test: all
+podman-test:
 	podman build -t managed-tokens-test . --build-arg=rpmfile=$(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
 	# We want to see if the version inside the container matches the built version
 	[ "$$(podman run --rm managed-tokens-test | cut -f 1 -d ',' | cut -f 5 -d ' ')" = "$(VERSION)" ] && echo "Podman test passed" || (echo "Podman test failed")
