@@ -22,10 +22,12 @@ signflagCommit :=
 endif
 
 
-all: release podman-test
+all: test release podman-test
 release: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
-.PHONY: all release git-tag podman-test git-revert-tag clean clean-all
+.PHONY: all release test git-tag podman-test git-revert-tag clean clean-all
 
+test:
+	go test -v ./... && echo "All tests passed" || (echo "Some tests failed" && exit 1)
 
 $(specfile): Makefile
 	sed -Ei 's/Version\:[ ]*.+/Version:        $(rpmVersion)/' $(specfile)
