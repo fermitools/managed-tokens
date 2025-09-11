@@ -8,7 +8,7 @@ buildTarPath = $(ROOTDIR)/$(buildTarName).tar.gz
 SOURCEDIR = $(ROOTDIR)/$(buildTarName)
 executables = refresh-uids-from-ferry token-push
 libsonnetDir = $(ROOTDIR)/libsonnet
-libsonnetFiles = $(shell find $(libsonnetDir) -name '*.libsonnet' -maxdepth 1 -type f)
+libsonnetFiles = $(shell find $(libsonnetDir) -maxdepth 1  -name '*.libsonnet' -type f)
 specfile := $(ROOTDIR)/packaging/$(NAME).spec
 ifdef RACE
 raceflag := -race
@@ -22,8 +22,9 @@ signflagCommit :=
 endif
 
 
-all: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
-.PHONY: all all-test git-tag git-revert-tag clean clean-all
+all: release podman-test
+release: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
+.PHONY: all release git-tag podman-test git-revert-tag clean clean-all
 
 
 $(specfile): Makefile
@@ -70,7 +71,9 @@ $(NAME)-$(rpmVersion)*.rpm: $(specfile) $(buildTarPath)
 
 podman-test: all
 	podman build -t managed-tokens-test . --build-arg=rpmfile=$(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename)
-	[ "$(podman run --rm managed-tokens-test | grep -oP "Managed tokens library version \Kv[0-9]\.[0-9]+\.[0-9]+(?=,.*))" = "$(VERSION)" ] && echo "Podman test passed" || (echo "Podman test failed)
+	# We want to see if the version inside the container matches the built version
+	[ "$$(podman run --rm managed-tokens-test | cut -f 1 -d ',' | cut -f 5 -d ' ')" = "$(VERSION)" ] && echo "Podman test passed" || (echo "Podman test failed")
+	podman image rm managed-tokens-test
 
 git-revert-tag:
 	git tag -d $(VERSION)
