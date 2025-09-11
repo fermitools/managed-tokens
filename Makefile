@@ -23,7 +23,7 @@ endif
 
 
 all: test release podman-test
-release: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)*.rpm
+release: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)-*.rpm
 .PHONY: all release test git-tag podman-test git-revert-tag clean clean-all
 
 test:
@@ -60,15 +60,15 @@ $(buildTarPath): $(executables) $(ROOTDIR)/libsonnet $(ROOTDIR)/Makefile_jsonnet
 	echo "Built deployment tarball"
 
 
-$(NAME)-$(rpmVersion)*.rpm: rpmSourcesDir := $$HOME/rpmbuild/SOURCES
-$(NAME)-$(rpmVersion)*.rpm: rpmSpecsDir := $$HOME/rpmbuild/SPECS
-$(NAME)-$(rpmVersion)*.rpm: rpmDir := $$HOME/rpmbuild/RPMS/x86_64/
-$(NAME)-$(rpmVersion)*.rpm: $(specfile) $(buildTarPath)
+$(NAME)-$(rpmVersion)-*.rpm: rpmSourcesDir := $$HOME/rpmbuild/SOURCES
+$(NAME)-$(rpmVersion)-*.rpm: rpmSpecsDir := $$HOME/rpmbuild/SPECS
+$(NAME)-$(rpmVersion)-*.rpm: rpmDir := $$HOME/rpmbuild/RPMS/x86_64/
+$(NAME)-$(rpmVersion)-*.rpm: $(specfile) $(buildTarPath)
 	cp $< $(rpmSpecsDir)/
 	cp $(buildTarPath) $(rpmSourcesDir)/
 	cd $(rpmSpecsDir); \
 	rpmbuild -ba ${NAME}.spec
-	find $(HOME)/rpmbuild/RPMS -type f -name "$(NAME)-$(rpmVersion)*.rpm" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
+	find $(HOME)/rpmbuild/RPMS -type f -name "$@" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
 	echo "Created RPM and copied it to current working directory"
 
 podman-test:
@@ -92,4 +92,4 @@ clean:
 	(test -e $(rpmSourcesDir)/$(buildTarName).tar.gz) && (rm $(rpmSourcesDir)/$(buildTarName).tar.gz)
 
 clean-all: clean git-revert-tag
-	(test -e $(ROOTDIR)/$(NAME)-$(rpmVersion)*.rpm) && (rm $(ROOTDIR)/$(NAME)-$(rpmVersion)*.rpm)
+	(test -e $(ROOTDIR)/$(NAME)-$(rpmVersion)-*.rpm) && (rm $(ROOTDIR)/$(NAME)-$(rpmVersion)-*.rpm)
