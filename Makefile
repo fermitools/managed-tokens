@@ -41,13 +41,17 @@ git-tag: $(specfile)
 
 
 $(executables): cmd/*/*.go internal/*/*.go
+    mkdir $(ROOTDIR)/binbackup
 	for exe in $(executables); do \
+		echo "Backing up existing $$exe if it exists"; \
+		(test -e $(ROOTDIR)/$$exe) && (mv $(ROOTDIR)/$$exe $(ROOTDIR)/binbackup/$$exe); \
 		echo "Building $$exe"; \
-		cd cmd/$$exe;\
+		cd cmd/$$exe; \
 		go build $(raceflag) -ldflags="-X main.buildTimestamp=$(BUILD)" -o $(ROOTDIR)/$$exe;  \
 		echo "Built $$exe"; \
 		cd $(ROOTDIR); \
 	done
+	rm -Rf $(ROOTDIR)/binbackup
 
 
 $(buildTarPath): $(executables) $(ROOTDIR)/libsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/packaging/*
@@ -70,6 +74,7 @@ $(NAME)-$(rpmVersion)-*.rpm: $(specfile) $(buildTarPath)
 	rpmbuild -ba ${NAME}.spec
 	find $(HOME)/rpmbuild/RPMS -type f -name "$@" -cmin 1 -exec cp {} $(ROOTDIR)/ \;
 	echo "Created RPM and copied it to current working directory"
+
 
 podman-test:
 	podman build -f $(ROOTDIR)/packaging/Dockerfile_test -t managed-tokens-test --build-arg=rpmfile=$(shell find $(ROOTDIR) -maxdepth 1 -type f -name "$(NAME)-$(rpmVersion)*.rpm" | head -n 1 | xargs basename) .
