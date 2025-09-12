@@ -41,7 +41,7 @@ git-tag: $(specfile)
 
 
 $(executables): cmd/*/*.go internal/*/*.go
-    mkdir $(ROOTDIR)/binbackup
+	mkdir $(ROOTDIR)/binbackup
 	for exe in $(executables); do \
 		echo "Backing up existing $$exe if it exists"; \
 		(test -e $(ROOTDIR)/$$exe) && (mv $(ROOTDIR)/$$exe $(ROOTDIR)/binbackup/$$exe); \

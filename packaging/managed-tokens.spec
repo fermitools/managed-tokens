@@ -67,8 +67,6 @@ rm -rf %{buildroot}
 
 %files
 %defattr(0755, rexbatch, fife, 0774)
-%{_sysconfdir}/%{name}
-%{_sysconfdir}/%{name}/libsonnet
 %config(noreplace) %{_sysconfdir}/%{name}/managedTokens.jsonnet
 %config(noreplace) %{_sysconfdir}/%{name}/Makefile
 %config(noreplace) %{_sysconfdir}/%{name}/libsonnet/*.libsonnet
