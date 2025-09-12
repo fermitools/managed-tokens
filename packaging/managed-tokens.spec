@@ -41,13 +41,13 @@ mkdir -p %{buildroot}/%{_sysconfdir}/%{name}/libsonnet
 
 # libsonnet files
 for file in `find libsonnet/ -name '*.libsonnet' -type f`; do
-    install -m 0774 ${file} %{buildroot}/%{_sysconfdir}/%{name}/${file}  # Will be something like /etc/managed-tokens/libsonnet/myfile.libsonnet
+    install -m 0644 ${file} %{buildroot}/%{_sysconfdir}/%{name}/${file}  # Will be something like /etc/managed-tokens/libsonnet/myfile.libsonnet
 done
 
 # Main jsonnet file
-install -m 0774 managedTokens.jsonnet %{buildroot}/%{_sysconfdir}/%{name}/managedTokens.jsonnet
+install -m 0644 managedTokens.jsonnet %{buildroot}/%{_sysconfdir}/%{name}/managedTokens.jsonnet
 # Makefile_jsonnet will be installed to /etc/managed-tokens/Makefile
-install -m 0774 Makefile_jsonnet %{buildroot}/%{_sysconfdir}/%{name}/Makefile
+install -m 0644 Makefile_jsonnet %{buildroot}/%{_sysconfdir}/%{name}/Makefile
 
 ###
 # Executables to /usr/bin
@@ -100,6 +100,10 @@ install -d %{_sharedstatedir}/%{name}/service-credd-vault-tokens -m 0774 -o rexb
 }
 
 %changelog
+* Fri Sep 12 2025 Shreyas Bhat <sbhat@fnal.gov> - 0.17.1
+- Removed %{_sysconfdir}/%{name} and %{_sysconfdir}/%{name}/libsonnet from listed files, since they are already included later
+- /etc/libsonnet should be created with permissions 644, not 774, since none of the files there are executables.
+
 * Wed Aug 13 2025 Shreyas Bhat <sbhat@fnal.gov> - 0.17
 - Added jsonnet dependency
 - Removed /etc/managed-tokens/managedTokens.yml from spec
