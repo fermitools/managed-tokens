@@ -23,8 +23,8 @@ endif
 
 
 all: test release podman-test
-release: $(specfile) git-tag $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)-*.rpm
-.PHONY: all release test git-tag podman-test git-revert-tag clean clean-all
+release: $(specfile) git-tag backup-old-executables $(executables) $(buildTarPath) $(NAME)-$(rpmVersion)-*.rpm
+.PHONY: all release test git-tag backup-old-executables podman-test git-revert-tag clean clean-all
 
 test:
 	go test -v ./... && echo "All tests passed" || (echo "Some tests failed" && exit 1)
@@ -39,19 +39,20 @@ git-tag: $(specfile)
 	git commit $(signflagCommit) -m 'Release $(VERSION)'
 	git tag $(VERSION)
 
-
-$(executables): cmd/*/*.go internal/*/*.go
-	mkdir $(ROOTDIR)/binbackup
+backup-old-executables:
 	for exe in $(executables); do \
 		echo "Backing up existing $$exe if it exists"; \
-		(test -e $(ROOTDIR)/$$exe) && (mv $(ROOTDIR)/$$exe $(ROOTDIR)/binbackup/$$exe); \
+		((test -e $(ROOTDIR)/$$exe) && ((mkdir -p $(ROOTDIR)/binbackup) && (mv $(ROOTDIR)/$$exe $(ROOTDIR)/binbackup/$$exe))) || (echo "No existing executable $$exe to backup"); \
+	done
+
+$(executables): cmd/*/*.go internal/*/*.go
+	for exe in $(executables); do \
 		echo "Building $$exe"; \
 		cd cmd/$$exe; \
 		go build $(raceflag) -ldflags="-X main.buildTimestamp=$(BUILD)" -o $(ROOTDIR)/$$exe;  \
 		echo "Built $$exe"; \
 		cd $(ROOTDIR); \
 	done
-	rm -Rf $(ROOTDIR)/binbackup
 
 
 $(buildTarPath): $(executables) $(ROOTDIR)/libsonnet $(ROOTDIR)/Makefile_jsonnet $(ROOTDIR)/managedTokens.jsonnet $(ROOTDIR)/packaging/*
