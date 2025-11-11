@@ -8,7 +8,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"io"
-	"io/ioutil"
 
 	"github.com/lestrrat-go/jwx/internal/base64"
 	"github.com/lestrrat-go/jwx/internal/json"
@@ -25,7 +24,7 @@ import (
 
 var registry = json.NewRegistry()
 
-// Encrypt takes the plaintext payload and encrypts it in JWE compact format.
+// Encrypt takes the pllaintext payload and encrypts it in JWE compact format.
 // `key` should be a public key, and it may be a raw key (e.g. rsa.PublicKey) or a jwk.Key
 //
 // Encrypt currently does not support multi-recipient messages.
@@ -179,9 +178,10 @@ type DecryptCtx interface {
 }
 
 type decryptCtx struct {
-	alg jwa.KeyEncryptionAlgorithm
-	key interface{}
-	msg *Message
+	alg                     jwa.KeyEncryptionAlgorithm
+	key                     interface{}
+	msg                     *Message
+	maxDecompressBufferSize int64
 }
 
 func (ctx *decryptCtx) Algorithm() jwa.KeyEncryptionAlgorithm {
@@ -213,6 +213,11 @@ func (ctx *decryptCtx) SetMessage(m *Message) {
 // The JWE message can be either compact or full JSON format.
 //
 // `key` must be a private key. It can be either in its raw format (e.g. *rsa.PrivateKey) or a jwk.Key
+//
+// The decrypted payload must be smaller than the amount specified by the
+// `jwe.WithMaxDecompressBufferSize` setting, which defaults to 10MB.
+//
+//	jwe.Decrypt(..., jwe.WithMaxDecompressBufferSize(250*1024))
 func Decrypt(buf []byte, alg jwa.KeyEncryptionAlgorithm, key interface{}, options ...DecryptOption) ([]byte, error) {
 	var ctx decryptCtx
 	ctx.key = key
@@ -220,6 +225,8 @@ func Decrypt(buf []byte, alg jwa.KeyEncryptionAlgorithm, key interface{}, option
 
 	var dst *Message
 	var postParse PostParser
+	// in v1 the default value is hardcoded. Use v2 if you want to change this value globally
+	var maxDecompressBufferSize int64 = 10 * 1024 * 1024
 	//nolint:forcetypeassert
 	for _, option := range options {
 		switch option.Ident() {
@@ -227,6 +234,8 @@ func Decrypt(buf []byte, alg jwa.KeyEncryptionAlgorithm, key interface{}, option
 			dst = option.Value().(*Message)
 		case identPostParser{}:
 			postParse = option.Value().(PostParser)
+		case identMaxDecompressBufferSize{}:
+			maxDecompressBufferSize = option.Value().(int64)
 		}
 	}
 
@@ -241,6 +250,7 @@ func Decrypt(buf []byte, alg jwa.KeyEncryptionAlgorithm, key interface{}, option
 			return nil, errors.Wrap(err, `failed to execute PostParser hook`)
 		}
 	}
+	ctx.maxDecompressBufferSize = maxDecompressBufferSize
 
 	payload, err := doDecryptCtx(&ctx)
 	if err != nil {
@@ -281,7 +291,7 @@ func ParseString(s string) (*Message, error) {
 
 // ParseReader is the same as Parse, but takes an io.Reader.
 func ParseReader(src io.Reader) (*Message, error) {
-	buf, err := ioutil.ReadAll(src)
+	buf, err := io.ReadAll(src)
 	if err != nil {
 		return nil, errors.Wrap(err, `failed to read from io.Reader`)
 	}
@@ -365,13 +375,13 @@ func parseCompact(buf []byte, storeProtectedHeaders bool) (*Message, error) {
 //
 // In that case you would register a custom field as follows
 //
-//   jwe.RegisterCustomField(`x-birthday`, timeT)
+//	jwe.RegisterCustomField(`x-birthday`, timeT)
 //
 // Then `hdr.Get("x-birthday")` will still return an `interface{}`,
 // but you can convert its type to `time.Time`
 //
-//   bdayif, _ := hdr.Get(`x-birthday`)
-//   bday := bdayif.(time.Time)
+//	bdayif, _ := hdr.Get(`x-birthday`)
+//	bday := bdayif.(time.Time)
 func RegisterCustomField(name string, object interface{}) {
 	registry.Register(name, object)
 }

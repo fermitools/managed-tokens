@@ -6,8 +6,8 @@
 // If you do not care about the details, the only things that you
 // would need to use are the following functions:
 //
-//     jws.Sign(payload, algorithm, key)
-//     jws.Verify(encodedjws, algorithm, key)
+//	jws.Sign(payload, algorithm, key)
+//	jws.Verify(encodedjws, algorithm, key)
 //
 // To sign, simply use `jws.Sign`. `payload` is a []byte buffer that
 // contains whatever data you want to sign. `alg` is one of the
@@ -30,7 +30,6 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -650,13 +649,13 @@ func (ctx *verifyCtx) tryVerify(verifier Verifier, hdr Headers, buf, decodedSign
 	return decodedPayload, nil
 }
 
-// This is an "optimized" ioutil.ReadAll(). It will attempt to read
+// This is an "optimized" io.ReadAll(). It will attempt to read
 // all of the contents from the reader IF the reader is of a certain
 // concrete type.
 func readAll(rdr io.Reader) ([]byte, bool) {
 	switch rdr.(type) {
 	case *bytes.Reader, *bytes.Buffer, *strings.Reader:
-		data, err := ioutil.ReadAll(rdr)
+		data, err := io.ReadAll(rdr)
 		if err != nil {
 			return nil, false
 		}
@@ -892,14 +891,13 @@ func parse(protected, payload, signature []byte) (*Message, error) {
 //
 // In that case you would register a custom field as follows
 //
-//   jwe.RegisterCustomField(`x-birthday`, timeT)
+//	jwe.RegisterCustomField(`x-birthday`, timeT)
 //
 // Then `hdr.Get("x-birthday")` will still return an `interface{}`,
 // but you can convert its type to `time.Time`
 //
-//   bdayif, _ := hdr.Get(`x-birthday`)
-//   bday := bdayif.(time.Time)
-//
+//	bdayif, _ := hdr.Get(`x-birthday`)
+//	bday := bdayif.(time.Time)
 func RegisterCustomField(name string, object interface{}) {
 	registry.Register(name, object)
 }

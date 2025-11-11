@@ -6,7 +6,6 @@ package jwt
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -86,7 +85,7 @@ func Parse(s []byte, options ...ParseOption) (Token, error) {
 // ParseReader calls Parse against an io.Reader
 func ParseReader(src io.Reader, options ...ParseOption) (Token, error) {
 	// We're going to need the raw bytes regardless. Read it.
-	data, err := ioutil.ReadAll(src)
+	data, err := io.ReadAll(src)
 	if err != nil {
 		return nil, errors.Wrap(err, `failed to read from token data source`)
 	}
@@ -264,7 +263,7 @@ func verifyJWSWithKeySet(ctx *parseCtx, payload []byte) ([]byte, int, error) {
 			return nil, _JwsVerifyInvalid, errors.Wrapf(err, `invalid signature algorithm %s`, key.Algorithm())
 		}
 
-		// Okay, we have a valid algorithm, go go
+		// Okay, we have a valid algorithm
 		return verifyJWSWithParams(ctx, payload, alg, key)
 	}
 
@@ -548,14 +547,13 @@ func (t *stdToken) Clone() (Token, error) {
 //
 // In that case you would register a custom field as follows
 //
-//   jwt.RegisterCustomField(`x-birthday`, timeT)
+//	jwt.RegisterCustomField(`x-birthday`, timeT)
 //
 // Then `token.Get("x-birthday")` will still return an `interface{}`,
 // but you can convert its type to `time.Time`
 //
-//   bdayif, _ := token.Get(`x-birthday`)
-//   bday := bdayif.(time.Time)
-//
+//	bdayif, _ := token.Get(`x-birthday`)
+//	bday := bdayif.(time.Time)
 func RegisterCustomField(name string, object interface{}) {
 	registry.Register(name, object)
 }
