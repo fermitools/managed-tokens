@@ -141,7 +141,6 @@ func getDefaultVaultTokenLocation() (string, error) {
 	return fmt.Sprintf("/tmp/vt_u%s", currentUID), nil
 }
 
-// TODO Test
 // getDefaultBearerTokenFileLocation returns the default location for the bearer token file, following the logic of the WLCG Bearer Token Discovery specification:
 // 1. If the BEARER_TOKEN_FILE environment variable is set, use that
 // 2. If the XDG_RUNTIME_DIR environment variable is set, use $XDG_RUNTIME_DIR/bt_u<uid>
@@ -265,6 +264,7 @@ type HtgettokenClient struct {
 	CommandEnvironment environment.CommandEnvironment
 }
 
+// TODO Test logic
 // NewHtgettokenClient creates a new htgettokenClient instance.
 // outFile and options are optional - if not provided, they will be set to default values.
 // The HTGETTOKENOPTS environment variable should be set in the CommandEnvironment if needed, like this:
@@ -304,12 +304,14 @@ func NewHtgettokenClient(vaultServer, vaultTokenFile, outFile string, interactiv
 
 }
 
+// TODO Test
 func (h *HtgettokenClient) WithVerbose() *HtgettokenClient {
 	// Add the --verbose flag to the options
 	h.verbose = true
 	return h
 }
 
+// TODO Test with mocked htgettoken
 func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, interactive bool) error {
 	funcLogger := log.WithField("caller", "HtgettokenClient.GetToken")
 	if err := ctx.Err(); err != nil {
@@ -345,6 +347,7 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 	return nil
 }
 
+// TODO test
 func (h *HtgettokenClient) prepareCmdArgs(issuer, role string) []string {
 	cmdArgs := []string{
 		"-a",
@@ -369,6 +372,7 @@ func (h *HtgettokenClient) prepareCmdArgs(issuer, role string) []string {
 	return cmdArgs
 }
 
+// TODO test with fake token
 func checkToken(tokenFile, issuer, role string) error {
 	// Read token in tokenFile in, validate it as a SciToken, and return it
 	funcLogger := log.WithField("tokenFile", tokenFile)
@@ -421,6 +425,7 @@ type commandExecutor interface {
 type interactiveExecutor struct{}
 type nonInteractiveExecutor struct{}
 
+// TODO test
 func (i *interactiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "vaultToken.interactiveExecutor.executeCommand")
 	span.SetAttributes(
@@ -454,6 +459,8 @@ func (i *interactiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) e
 	return nil
 }
 
+// TODO test
+// Mock authNeeded, or regular error, or it works, or timeout
 func (n *nonInteractiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "vaultToken.nonInteractiveExecutor.executeCommand")
 	span.SetAttributes(

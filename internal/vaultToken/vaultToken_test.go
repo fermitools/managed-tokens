@@ -22,6 +22,8 @@ import (
 	"os/user"
 	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestIsServiceToken checks a number of candidate service tokens and verifies that IsServiceToken correctly identifies whether or not
@@ -311,6 +313,94 @@ func TestGetAllVaultTokenLocations(t *testing.T) {
 				if !slices.Equal(result, test.expectedResult) {
 					t.Errorf("Got wrong result.  Expected %v, got %v", test.expectedResult, result)
 				}
+			},
+		)
+	}
+}
+
+// TODO Test
+// getDefaultBearerTokenFileLocation returns the default location for the bearer token file, following the logic of the WLCG Bearer Token Discovery specification:
+// 1. If the BEARER_TOKEN_FILE environment variable is set, use that
+// 2. If the XDG_RUNTIME_DIR environment variable is set, use $XDG_RUNTIME_DIR/bt_u<uid>
+// 3. Otherwise, use /tmp/bt_u<uid>
+//
+// See https://zenodo.org/records/3937438 for more details
+func TestGetDefaultBearerTokenFileLocation(t *testing.T) {
+	// func TestGetDefaultBearerTokenFileLocation() (string, error) {
+	currentUser, _ := user.Current()
+	uid := currentUser.Uid
+
+	type testCase struct {
+		description            string
+		bearerTokenFileSetFunc func(*testing.T)
+		xdgRuntimeDirSetFunc   func(*testing.T) (cleanup func())
+		expectedResult         string
+		expectedErrNil         bool
+	}
+	testCases := []testCase{
+		{
+			"BEARER_TOKEN_FILE is set",
+			func(t *testing.T) { t.Setenv("BEARER_TOKEN_FILE", "/path/to/bearer_token_file") },
+			func(t *testing.T) func() { return nil },
+			"/path/to/bearer_token_file",
+			true,
+		},
+		{
+			"XDG_RUNTIME_DIR is set, BEARER_TOKEN_FILE is not set",
+			func(t *testing.T) {},
+			func(t *testing.T) func() {
+				t.Setenv("XDG_RUNTIME_DIR", "/fake/xdg/path/1000")
+				return nil
+			},
+			fmt.Sprintf("/fake/xdg/path/1000/bt_u%s", uid),
+			true,
+		},
+		{
+			"BEARER_TOKEN_FILE is set, XDG_RUNTIME_DIR is also set",
+			func(t *testing.T) { t.Setenv("BEARER_TOKEN_FILE", "/path/to/bearer_token_file") },
+			func(t *testing.T) func() {
+				t.Setenv("XDG_RUNTIME_DIR", "/fake/xdg/path/1000")
+				return nil
+			},
+			"/path/to/bearer_token_file",
+			true,
+		},
+		{
+			"Neither BEARER_TOKEN_FILE nor XDG_RUNTIME_DIR is set",
+			func(t *testing.T) {},
+			func(t *testing.T) func() {
+				oldValue, existed := os.LookupEnv("XDG_RUNTIME_DIR")
+				if existed {
+					os.Unsetenv("XDG_RUNTIME_DIR")
+				}
+				return func() {
+					if existed {
+						os.Setenv("XDG_RUNTIME_DIR", oldValue)
+					}
+				}
+			},
+			fmt.Sprintf("/tmp/bt_u%s", uid),
+			true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(
+			tc.description,
+			func(t *testing.T) {
+				tc.bearerTokenFileSetFunc(t)
+				cleanup := tc.xdgRuntimeDirSetFunc(t)
+				if cleanup != nil {
+					t.Cleanup(cleanup)
+				}
+
+				result, err := getDefaultBearerTokenFileLocation()
+				if !tc.expectedErrNil {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+				assert.Equal(t, tc.expectedResult, result)
 			},
 		)
 	}
