@@ -23,6 +23,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/fermitools/managed-tokens/internal/environment"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -412,4 +413,104 @@ func createFileIfNotExist(path string) string {
 		os.Create(path)
 	}
 	return path
+}
+
+func TestNewHtgettokenClient(t *testing.T) {
+	type expectedError struct {
+		isNotNil bool
+		contains string
+	}
+
+	env := &environment.CommandEnvironment{}
+	opts := []string{"--test-option1", "--test-option2", "value2"}
+	defaultVaultTokenFile, _ := getDefaultVaultTokenLocation()
+	defaultOutfile, _ := getDefaultBearerTokenFileLocation()
+
+	type testCase struct {
+		description    string
+		vaultServer    string
+		vaultTokenFile string
+		outFile        string
+		expectedResult *HtgettokenClient
+		expectedErr    expectedError
+	}
+
+	testCases := []testCase{
+		{
+			"All parameters provided",
+			"https://vault.example.com",
+			"/path/to/vault_token_file",
+			"/path/to/output_file",
+			&HtgettokenClient{
+				vaultServer:        "https://vault.example.com",
+				vaultTokenFile:     "/path/to/vault_token_file",
+				outFile:            "/path/to/output_file",
+				options:            opts,
+				CommandEnvironment: env,
+			},
+			expectedError{},
+		},
+		{
+			"Missing vault server",
+			"",
+			"/path/to/vault_token_file",
+			"/path/to/output_file",
+			nil,
+			expectedError{
+				isNotNil: true,
+				contains: "vault server cannot be empty",
+			},
+		},
+		{
+			"Missing vaultTokenFile",
+			"https://vault.example.com",
+			"",
+			"/path/to/output_file",
+			&HtgettokenClient{
+				vaultServer:        "https://vault.example.com",
+				vaultTokenFile:     defaultVaultTokenFile,
+				outFile:            "/path/to/output_file",
+				options:            opts,
+				CommandEnvironment: env,
+			},
+			expectedError{},
+		},
+		{
+			"Missing outFile",
+			"https://vault.example.com",
+			"/path/to/vault_token_file",
+			"",
+			&HtgettokenClient{
+				vaultServer:        "https://vault.example.com",
+				vaultTokenFile:     "/path/to/vault_token_file",
+				outFile:            defaultOutfile,
+				options:            opts,
+				CommandEnvironment: env,
+			},
+			expectedError{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(
+			tc.description,
+			func(t *testing.T) {
+				client, err := NewHtgettokenClient(tc.vaultServer, tc.vaultTokenFile, tc.outFile, env, opts...)
+				if !tc.expectedErr.isNotNil {
+					assert.Equal(t, tc.expectedResult.vaultServer, client.vaultServer)
+					assert.Equal(t, tc.expectedResult.vaultTokenFile, client.vaultTokenFile)
+					assert.Equal(t, tc.expectedResult.outFile, client.outFile)
+					assert.True(t, slices.Equal(tc.expectedResult.options, client.options))
+					assert.Equal(t, *tc.expectedResult.CommandEnvironment, *client.CommandEnvironment)
+				}
+
+				assert.Equal(t, tc.expectedErr.isNotNil, err != nil)
+
+				if tc.expectedErr.isNotNil {
+					assert.Contains(t, err.Error(), tc.expectedErr.contains)
+				}
+			},
+		)
+	}
+
 }

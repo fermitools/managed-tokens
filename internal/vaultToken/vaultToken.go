@@ -199,35 +199,35 @@ func validateVaultToken(vaultTokenFilename string) error {
 	return nil
 }
 
-// TODO STILL UNDER DEVELOPMENT.  Export when ready, and add tracing
-func GetToken(ctx context.Context, userPrincipal, serviceName, vaultServer string, environ environment.CommandEnvironment) error {
-	htgettokenArgs := []string{
-		"-d",
-		"-a",
-		vaultServer,
-		"-i",
-		serviceName,
-	}
+// // TODO STILL UNDER DEVELOPMENT.  Export when ready, and add tracing
+// func GetToken(ctx context.Context, userPrincipal, serviceName, vaultServer string, environ environment.CommandEnvironment) error {
+// 	htgettokenArgs := []string{
+// 		"-d",
+// 		"-a",
+// 		vaultServer,
+// 		"-i",
+// 		serviceName,
+// 	}
 
-	htgettokenCmd := environment.EnvironmentWrappedCommand(ctx, &environ, vaultExecutables["htgettoken"], htgettokenArgs...)
-	// TODO Get rid of all this when it works
-	htgettokenCmd.Stdout = os.Stdout
-	htgettokenCmd.Stderr = os.Stderr
-	log.Debug(htgettokenCmd.Args)
+// 	htgettokenCmd := environment.EnvironmentWrappedCommand(ctx, &environ, vaultExecutables["htgettoken"], htgettokenArgs...)
+// 	// TODO Get rid of all this when it works
+// 	htgettokenCmd.Stdout = os.Stdout
+// 	htgettokenCmd.Stderr = os.Stderr
+// 	log.Debug(htgettokenCmd.Args)
 
-	log.WithField("service", serviceName).Info("Running htgettoken to get vault and bearer tokens")
-	if stdoutStderr, err := htgettokenCmd.CombinedOutput(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			log.WithField("service", serviceName).Error("Context timeout")
-			return ctx.Err()
-		}
-		log.WithField("service", serviceName).Errorf("Could not get vault token:\n%s", string(stdoutStderr[:]))
-		return err
-	}
+// 	log.WithField("service", serviceName).Info("Running htgettoken to get vault and bearer tokens")
+// 	if stdoutStderr, err := htgettokenCmd.CombinedOutput(); err != nil {
+// 		if ctx.Err() == context.DeadlineExceeded {
+// 			log.WithField("service", serviceName).Error("Context timeout")
+// 			return ctx.Err()
+// 		}
+// 		log.WithField("service", serviceName).Errorf("Could not get vault token:\n%s", string(stdoutStderr[:]))
+// 		return err
+// 	}
 
-	log.WithField("service", serviceName).Debug("Successfully got vault token")
-	return nil
-}
+// 	log.WithField("service", serviceName).Debug("Successfully got vault token")
+// 	return nil
+// }
 
 // Notes:
 // 1. getDefaultVaultTokenLocation is already defined above and gets the vault token location we need
@@ -261,7 +261,7 @@ type HtgettokenClient struct {
 	outFile            string
 	options            []string
 	verbose            bool // Whether to enable verbose mode for htgettoken
-	CommandEnvironment environment.CommandEnvironment
+	CommandEnvironment *environment.CommandEnvironment
 }
 
 // TODO Test logic
@@ -271,7 +271,7 @@ type HtgettokenClient struct {
 //
 //	c := environment.CommandEnvironment{}
 //	c.SetHtgettokenOpts("value")
-func NewHtgettokenClient(vaultServer, vaultTokenFile, outFile string, interactive bool, env environment.CommandEnvironment, options ...string) (*HtgettokenClient, error) {
+func NewHtgettokenClient(vaultServer, vaultTokenFile, outFile string, env *environment.CommandEnvironment, options ...string) (*HtgettokenClient, error) {
 	if vaultServer == "" {
 		return nil, errors.New("vault server cannot be empty")
 	}
@@ -331,7 +331,7 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 
 	cmdArgs := h.prepareCmdArgs(issuer, role)
 
-	cmd := environment.EnvironmentWrappedCommand(ctx, &h.CommandEnvironment, vaultExecutables["htgettoken"], cmdArgs...)
+	cmd := environment.EnvironmentWrappedCommand(ctx, h.CommandEnvironment, vaultExecutables["htgettoken"], cmdArgs...)
 	funcLogger.Debug("Running htgettoken command", "command", vaultExecutables["htgettoken"], "args", cmdArgs, "env", cmd.Env)
 
 	err := runner.executeCommand(ctx, cmd)
