@@ -264,7 +264,6 @@ type HtgettokenClient struct {
 	CommandEnvironment *environment.CommandEnvironment
 }
 
-// TODO Test logic
 // NewHtgettokenClient creates a new htgettokenClient instance.
 // outFile and options are optional - if not provided, they will be set to default values.
 // The HTGETTOKENOPTS environment variable should be set in the CommandEnvironment if needed, like this:
@@ -304,7 +303,6 @@ func NewHtgettokenClient(vaultServer, vaultTokenFile, outFile string, env *envir
 
 }
 
-// TODO Test
 func (h *HtgettokenClient) WithVerbose() *HtgettokenClient {
 	// Add the --verbose flag to the options
 	h.verbose = true

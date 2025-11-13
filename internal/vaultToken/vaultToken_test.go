@@ -514,3 +514,68 @@ func TestNewHtgettokenClient(t *testing.T) {
 	}
 
 }
+
+func TestHtgettokenClientWithVerbose(t *testing.T) {
+	h := &HtgettokenClient{}
+	h = h.WithVerbose()
+	assert.True(t, h.verbose)
+}
+
+func TestHtgettokenClientPrepareCmdArgs(t *testing.T) {
+	h := &HtgettokenClient{
+		vaultServer:    "https://vault.example.com",
+		vaultTokenFile: "/path/to/vault_token_file",
+		outFile:        "/path/to/output_file",
+		options: []string{
+			"--option1",
+			"--option2",
+			"value2",
+		},
+	}
+
+	issuer := "issuer_example"
+
+	type testCase struct {
+		description string
+		role        string
+		expected    []string
+	}
+
+	testCases := []testCase{
+		{
+			"With role",
+			"role_example",
+			[]string{
+				"-a", h.vaultServer,
+				"-i", issuer,
+				"--vaulttokenfile", h.vaultTokenFile,
+				"-o", h.outFile,
+				"--option1",
+				"--option2", "value2",
+				"--role", "role_example",
+			},
+		},
+		{
+			"Without role",
+			"",
+			[]string{
+				"-a", h.vaultServer,
+				"-i", issuer,
+				"--vaulttokenfile", h.vaultTokenFile,
+				"-o", h.outFile,
+				"--option1",
+				"--option2", "value2",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(
+			tc.description,
+			func(t *testing.T) {
+				result := h.prepareCmdArgs(issuer, tc.role)
+				assert.Equal(t, tc.expected, result)
+			},
+		)
+	}
+}
