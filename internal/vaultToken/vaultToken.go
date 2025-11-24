@@ -309,14 +309,13 @@ func (h *HtgettokenClient) WithVerbose() *HtgettokenClient {
 	return h
 }
 
-// TODO Test with mocked htgettoken
 func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, interactive bool) error {
 	funcLogger := log.WithField("caller", "HtgettokenClient.GetToken")
 	if err := ctx.Err(); err != nil {
 		msg := "context deadline exceeded before getting token"
 		if errors.Is(err, context.Canceled) {
 			msg = "context canceled before getting token"
-			funcLogger.Error(msg, "error", err)
+			funcLogger.Error(msg, " error:", err)
 			return fmt.Errorf("%s: %w", msg, err)
 		}
 		return fmt.Errorf("%s: %w", msg, err)

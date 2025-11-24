@@ -16,11 +16,13 @@
 package vaultToken
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/user"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fermitools/managed-tokens/internal/environment"
@@ -578,4 +580,119 @@ func TestHtgettokenClientPrepareCmdArgs(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestHtgettokenClientGetToken(t *testing.T) {
+	// Set to nil if no error expected
+	type errCheck struct {
+		contains string
+	}
+
+	errContainsErrCheckContains := func(err error, e *errCheck) bool {
+		// If e is nil, err must be nil as well
+		if e == nil {
+			return err == nil
+		}
+		// For non-nil e, err must be non-nil and contain the string
+		return err != nil && strings.Contains(err.Error(), e.contains)
+	}
+
+	type testCase struct {
+		description             string
+		interactive             bool
+		cancelContext           bool
+		setupMockHtgettokenFunc func(*testing.T) (cleanupFunc func())
+		expectedError           *errCheck
+	}
+
+	testCases := []testCase{
+		{
+			"Successful execution, non-interactive",
+			false,
+			false,
+			func(t *testing.T) func() {
+				cleanup := mockHtgettoken(t, 0)
+				return cleanup
+			},
+			nil,
+		},
+		{
+			"Context canceled before execution",
+			false,
+			true,
+			func(t *testing.T) func() {
+				cleanup := mockHtgettoken(t, 0)
+				return cleanup
+			},
+			&errCheck{contains: "context canceled before getting token"},
+		},
+		{
+			"Execution error - interactive",
+			true,
+			false,
+			func(t *testing.T) (cleanupFunc func()) {
+				cleanup := mockHtgettoken(t, 1)
+				return cleanup
+			},
+			&errCheck{contains: "error running htgettoken to obtain bearer token"},
+		},
+		{
+			"Execution error - non-interactive",
+			false,
+			false,
+			func(t *testing.T) (cleanupFunc func()) {
+				cleanup := mockHtgettoken(t, 2)
+				return cleanup
+			},
+			&errCheck{contains: "error running htgettoken to obtain bearer token"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(
+			tc.description,
+			func(t *testing.T) {
+				cleanup := tc.setupMockHtgettokenFunc(t)
+				defer cleanup()
+
+				h, _ := NewHtgettokenClient(
+					"https://vault.example.com",
+					"/path/to/vault_token_file",
+					"/path/to/output_file",
+					&environment.CommandEnvironment{},
+				)
+				ctx, cancel := context.WithCancel(context.Background())
+				if tc.cancelContext {
+					cancel()
+				}
+				defer cancel()
+				err := h.GetToken(ctx, "issuer_example", "role_example", tc.interactive)
+				assert.True(t, errContainsErrCheckContains(err, tc.expectedError))
+				// Note: We don't care about the token check for this test, so the warnings will not cause test failures
+			},
+		)
+	}
+}
+
+// Mock command that simulates successful htgettoken execution with exitCode given
+func mockHtgettoken(t *testing.T, exitCode uint) (cleanupFunc func()) {
+	t.Helper()
+
+	temp := t.TempDir()
+	fakeHtgettokenPath := fmt.Sprintf("%s/htgettoken", temp)
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+echo "Fake htgettoken executed"
+exit %d
+`, exitCode)
+	os.WriteFile(fakeHtgettokenPath, []byte(scriptContent), 0755)
+
+	oldPath, ok := vaultExecutables["htgettoken"]
+	vaultExecutables["htgettoken"] = fakeHtgettokenPath
+
+	cleanupFunc = func() {
+		if ok {
+			vaultExecutables["htgettoken"] = oldPath
+		}
+	}
+	return cleanupFunc
 }
