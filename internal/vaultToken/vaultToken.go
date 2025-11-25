@@ -424,7 +424,6 @@ type commandExecutor interface {
 type interactiveExecutor struct{}
 type nonInteractiveExecutor struct{}
 
-// TODO test
 func (i *interactiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "vaultToken.interactiveExecutor.executeCommand")
 	span.SetAttributes(

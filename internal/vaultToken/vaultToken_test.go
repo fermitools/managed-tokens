@@ -20,7 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
+	"path"
 	"slices"
 	"strings"
 	"testing"
@@ -756,6 +758,82 @@ func TestCheckToken(t *testing.T) {
 				tokenFile := tc.setupTokenFile(t)
 				err := checkToken(tokenFile, tc.issuer, tc.role)
 				assert.True(t, tc.expectedError.containsErr(err))
+			},
+		)
+	}
+}
+
+func TestInteractiveExecutorExecuteCommand(t *testing.T) {
+	temp := t.TempDir()
+	goodCommandPath := path.Join(temp, "goodCommand")
+	badCommandPath := path.Join(temp, "badCommand")
+
+	// Create a good command that just exits 0
+	os.WriteFile(goodCommandPath, []byte(`
+#!/bin/bash
+exit 0
+`), 0755)
+	// Create a bad command that exits 1
+	os.WriteFile(badCommandPath, []byte(`
+#!/bin/bash
+exit 1
+`), 0755)
+
+	// Find sh on the PATH
+	shPath, err := exec.LookPath("sh")
+	if err != nil {
+		t.Error("Couldn't find sh on PATH. These tests will fail")
+	}
+
+	type testCase struct {
+		description   string
+		testCommand   func(context.Context) *exec.Cmd
+		cancelContext bool
+		err           *errCheck
+	}
+
+	testCases := []testCase{
+		{
+			"Successful command execution",
+			func(ctx context.Context) *exec.Cmd {
+				return exec.CommandContext(ctx, shPath, goodCommandPath)
+			},
+			false,
+			nil,
+		},
+		{
+			"Context canceled before execution",
+			func(ctx context.Context) *exec.Cmd {
+				return exec.CommandContext(ctx, shPath, goodCommandPath)
+			},
+			true,
+			&errCheck{contains: "context canceled"},
+		},
+		{
+			"Command execution error",
+			func(ctx context.Context) *exec.Cmd {
+				return exec.CommandContext(ctx, shPath, badCommandPath)
+			},
+			false,
+			&errCheck{contains: "exit status 1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(
+			tc.description,
+			func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				if tc.cancelContext {
+					cancel()
+				}
+				defer cancel()
+
+				cmd := tc.testCommand(ctx)
+
+				executor := &interactiveExecutor{}
+				err := executor.executeCommand(ctx, cmd)
+				assert.True(t, tc.err.containsErr(err))
 			},
 		)
 	}
