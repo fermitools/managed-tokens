@@ -436,7 +436,7 @@ func (i *interactiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) e
 	c.Stderr = os.Stderr
 
 	if err := c.Start(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			span.SetStatus(codes.Error, "Context timeout")
 			return ctx.Err()
 		}
@@ -468,7 +468,7 @@ func (n *nonInteractiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd
 	funcLogger := log.WithField("caller", "vaultToken.nonInteractiveExecutor.executeCommand")
 
 	if stdoutStderr, err := c.CombinedOutput(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			span.SetStatus(codes.Error, "Context timeout")
 			return ctx.Err()
 		}

@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fermitools/managed-tokens/internal/environment"
 	"github.com/stretchr/testify/assert"
@@ -786,35 +787,36 @@ exit 1
 	}
 
 	type testCase struct {
-		description   string
-		testCommand   func(context.Context) *exec.Cmd
-		cancelContext bool
-		err           *errCheck
+		description           string
+		testCommandAndContext func(t *testing.T) (*exec.Cmd, context.Context)
+		err                   *errCheck
 	}
 
 	testCases := []testCase{
 		{
 			"Successful command execution",
-			func(ctx context.Context) *exec.Cmd {
-				return exec.CommandContext(ctx, shPath, goodCommandPath)
+			func(t *testing.T) (*exec.Cmd, context.Context) {
+				ctx := context.Background()
+				return exec.CommandContext(ctx, shPath, goodCommandPath), ctx
 			},
-			false,
 			nil,
 		},
 		{
-			"Context canceled before execution",
-			func(ctx context.Context) *exec.Cmd {
-				return exec.CommandContext(ctx, shPath, goodCommandPath)
+			"Context deadline exceeded before execution",
+			func(t *testing.T) (*exec.Cmd, context.Context) {
+				ctx2, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
+				t.Cleanup(cancel)
+				time.Sleep(2 * time.Nanosecond)
+				return exec.CommandContext(ctx2, shPath, goodCommandPath), ctx2
 			},
-			true,
-			&errCheck{contains: "context canceled"},
+			&errCheck{contains: "context deadline exceeded"},
 		},
 		{
 			"Command execution error",
-			func(ctx context.Context) *exec.Cmd {
-				return exec.CommandContext(ctx, shPath, badCommandPath)
+			func(t *testing.T) (*exec.Cmd, context.Context) {
+				ctx := context.Background()
+				return exec.CommandContext(ctx, shPath, badCommandPath), ctx
 			},
-			false,
 			&errCheck{contains: "exit status 1"},
 		},
 	}
@@ -823,14 +825,7 @@ exit 1
 		t.Run(
 			tc.description,
 			func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				if tc.cancelContext {
-					cancel()
-				}
-				defer cancel()
-
-				cmd := tc.testCommand(ctx)
-
+				cmd, ctx := tc.testCommandAndContext(t)
 				executor := &interactiveExecutor{}
 				err := executor.executeCommand(ctx, cmd)
 				assert.True(t, tc.err.containsErr(err))
