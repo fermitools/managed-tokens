@@ -344,7 +344,6 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 	return nil
 }
 
-// TODO test
 func (h *HtgettokenClient) prepareCmdArgs(issuer, role string) []string {
 	cmdArgs := []string{
 		"-a",
@@ -369,29 +368,32 @@ func (h *HtgettokenClient) prepareCmdArgs(issuer, role string) []string {
 	return cmdArgs
 }
 
-// TODO test with fake token
 func checkToken(tokenFile, issuer, role string) error {
 	// Read token in tokenFile in, validate it as a SciToken, and return it
-	funcLogger := log.WithField("tokenFile", tokenFile)
+	funcLogger := log.WithFields(log.Fields{
+		"tokenFile": tokenFile,
+		"issuer":    issuer,
+		"role":      role,
+	})
 	errValidateMsg := "error validating token"
 
 	tok, err := os.ReadFile(tokenFile)
 	if err != nil {
-		funcLogger.Error("error reading token file", "tokenFile", tokenFile, "error", err)
+		funcLogger.Errorf("error reading token file %s:", err)
 		return fmt.Errorf("%s: %w", errValidateMsg, err)
 	}
 
 	// Parse the token to verify that it's a valid JWT
 	jt, err := jwt.Parse(tok)
 	if err != nil {
-		funcLogger.Error("error parsing token", "tokenfile", tokenFile, "error", err)
+		funcLogger.Errorf("error parsing token: %s", err)
 		return fmt.Errorf("%s: %w", errValidateMsg, err)
 	}
 
 	// Convert our token to a SciToken
 	st, err := scitokens.NewSciToken(jt)
 	if err != nil {
-		funcLogger.Error("error creating SciToken from token file", "tokenfile", tokenFile, "error", err)
+		funcLogger.Errorf("error creating SciToken from token file: %s", err)
 		return fmt.Errorf("%s: %w", errValidateMsg, err)
 	}
 

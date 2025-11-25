@@ -583,19 +583,6 @@ func TestHtgettokenClientPrepareCmdArgs(t *testing.T) {
 }
 
 func TestHtgettokenClientGetToken(t *testing.T) {
-	// Set to nil if no error expected
-	type errCheck struct {
-		contains string
-	}
-
-	errContainsErrCheckContains := func(err error, e *errCheck) bool {
-		// If e is nil, err must be nil as well
-		if e == nil {
-			return err == nil
-		}
-		// For non-nil e, err must be non-nil and contain the string
-		return err != nil && strings.Contains(err.Error(), e.contains)
-	}
 
 	type testCase struct {
 		description             string
@@ -667,7 +654,7 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 				}
 				defer cancel()
 				err := h.GetToken(ctx, "issuer_example", "role_example", tc.interactive)
-				assert.True(t, errContainsErrCheckContains(err, tc.expectedError))
+				assert.True(t, tc.expectedError.containsErr(err))
 				// Note: We don't care about the token check for this test, so the warnings will not cause test failures
 			},
 		)
@@ -695,4 +682,95 @@ exit %d
 		}
 	}
 	return cleanupFunc
+}
+
+func TestCheckToken(t *testing.T) {
+	// Note: we're missing one test case - where the establishing of a NewEnforcer doesn't work.
+
+	// Fake token created from demo.scitokens.org that expires on 2222-02-22 22:22:22 UTC
+	goodTokenString := "eyJhbGciOiJSUzI1NiIsImtpZCI6ImtleS1yczI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6InJlYWQ6L3Byb3RlY3RlZCIsImF1ZCI6Imh0dHBzOi8vZGVtby5zY2l0b2tlbnMub3JnIiwidmVyIjoic2NpdG9rZW46Mi4wIiwiaXNzIjoiaHR0cHM6Ly9kZW1vLnNjaXRva2Vucy5vcmciLCJleHAiOjc5NTY5MTU3NDIsImlhdCI6MTc2NDAyNDM2OCwibmJmIjoxNzY0MDI0MzY4LCJ3bGNnLmdyb3VwcyI6WyIvZ3JvdXAiLCIvZ3JvdXAvcm9sZSJdLCJqdGkiOiI1OGQwN2EyZS1mYTg4LTQxMmUtOTA1My0wNmY2YjZhZDcyNzIifQ.dRpeZS3sQGb-rlqR27nlkTw0RzqxjKGErpUCSli0th02HvT1tfnlTvVxZX9mWTUQdZo3QnR5q83Yw7mLJtzLT-osqB1HQn98bWdsRZfe-cZzieBKbkkhevnskovO2jMQQeM6jGhtXaaLMSEJI9EGxM-yUPn7_WKWTsRKjbu-Snzg7KS8VqHnR0I-C_3PHPikPHLgq47C83kEewZ_thzi5wKYlP1NZVNaM5FG6P3Ul_KIHvKwenJ1aJOUrbRcervPALwKh5_vWvFW6ARrTR2Inv6lETHRIQtfsSSxImneRKHE4xUGU1Jfwrt54SZ-vDJcVbYSMq4ac18t_zQS_oAVLw"
+
+	// Token created from demo.scitokens.org with wlcg.groups as a single string rather than a slice. Expires on 2222-02-22 22:22:22 UTC
+	malformedGroupsTokenString := "eyJhbGciOiJSUzI1NiIsImtpZCI6ImtleS1yczI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6InJlYWQ6L3Byb3RlY3RlZCIsImF1ZCI6Imh0dHBzOi8vZGVtby5zY2l0b2tlbnMub3JnIiwidmVyIjoic2NpdG9rZW46Mi4wIiwiaXNzIjoiaHR0cHM6Ly9kZW1vLnNjaXRva2Vucy5vcmciLCJleHAiOjc5NTY5MTU3NDIsImlhdCI6MTc2NDAyNTA5NiwibmJmIjoxNzY0MDI1MDk2LCJ3bGNnLmdyb3VwcyI6Ii9ncm91cCIsImp0aSI6IjU4ZDA3YTJlLWZhODgtNDEyZS05MDUzLTA2ZjZiNmFkNzI3MiJ9.A5wMXvX7dHBmr5tz8SXRmbFONCQ9kobEVxjMBKTgRMBcItqDlZi5dhHQgOf2hg6GuePpiou0d-8vmFTGwOiDhV2Lvj1x0W6103M7owgcdQ2_TuDMfso61F5cmNEdq13k-R-1Dq649zSypnOot0_FyIyGBudTTE1SkDK2KViwbalaLnBAof-CsqINPDNSDZU2Zxvz4U1yvDoaTnA1pcnqpg6xOLjnSMth4vNacrUjOhY_9pL83BbH7A7-DMukfIpR1r2QVzXsnpRsSRc1cIjmxPMNdeFDFAEh2njRS3JMkhAZ60KQA6UI9M-gHWrEoJjwq1giHrYQIV4IsmkEvYDuDQ"
+
+	writeFakeToken := func(t *testing.T, tokenString string) func(t *testing.T) (tokenPath string) {
+		return func(*testing.T) string {
+			tokenFile := fmt.Sprintf("%s/fake_token.txt", t.TempDir())
+			os.WriteFile(tokenFile, []byte(tokenString), 0644)
+			return tokenFile
+		}
+	}
+
+	type testCase struct {
+		description    string
+		setupTokenFile func(t *testing.T) string
+		issuer         string
+		role           string
+		expectedError  *errCheck
+	}
+
+	testCases := []testCase{
+		{
+			"Valid token",
+			writeFakeToken(t, goodTokenString),
+			"group",
+			"role",
+			nil,
+		},
+		{
+			"Token file does not exist",
+			func(t *testing.T) string {
+				return fmt.Sprintf("%s/non_existent_token.txt", t.TempDir())
+			},
+			"group",
+			"role",
+			&errCheck{contains: "no such file or directory"},
+		},
+		{
+			"Invalid token content",
+			writeFakeToken(t, "thisisnotavalidtoken"),
+			"group",
+			"role",
+			&errCheck{contains: "failed to parse token"},
+		},
+		{
+			"Token with invalid wlcg.groups claim",
+			writeFakeToken(t, malformedGroupsTokenString),
+			"group",
+			"role",
+			&errCheck{contains: "wlcg.groups claim"},
+		},
+		{
+			"Wrong role in token",
+			writeFakeToken(t, goodTokenString),
+			"group",
+			"wrongrole",
+			&errCheck{contains: "token invalid"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(
+			tc.description,
+			func(t *testing.T) {
+				tokenFile := tc.setupTokenFile(t)
+				err := checkToken(tokenFile, tc.issuer, tc.role)
+				assert.True(t, tc.expectedError.containsErr(err))
+			},
+		)
+	}
+}
+
+// Set to nil if no error expected
+type errCheck struct {
+	contains string
+}
+
+func (e *errCheck) containsErr(err error) bool {
+	// If e is nil, err must be nil as well
+	if e == nil {
+		return err == nil
+	}
+	// For non-nil e, err must be non-nil and contain the string
+	return err != nil && strings.Contains(err.Error(), e.contains)
 }
