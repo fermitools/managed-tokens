@@ -764,22 +764,9 @@ func TestCheckToken(t *testing.T) {
 	}
 }
 
-func TestInteractiveExecutorExecuteCommand(t *testing.T) {
-	temp := t.TempDir()
-	goodCommandPath := path.Join(temp, "goodCommand")
-	badCommandPath := path.Join(temp, "badCommand")
-
-	// Create a good command that just exits 0
-	os.WriteFile(goodCommandPath, []byte(`
-#!/bin/bash
-exit 0
-`), 0755)
-	// Create a bad command that exits 1
-	os.WriteFile(badCommandPath, []byte(`
-#!/bin/bash
-exit 1
-`), 0755)
-
+// This test func covers all of the test cases for the interactiveExecutor and most of them for the nonInteractiveExecutor.
+// The remaining non-interactive test cases are in TestNoninteractiveExecutorExecuteCommand
+func TestExecutorExecuteCommand(t *testing.T) {
 	// Find sh on the PATH
 	shPath, err := exec.LookPath("sh")
 	if err != nil {
@@ -797,7 +784,7 @@ exit 1
 			"Successful command execution",
 			func(t *testing.T) (*exec.Cmd, context.Context) {
 				ctx := context.Background()
-				return exec.CommandContext(ctx, shPath, goodCommandPath), ctx
+				return exec.CommandContext(ctx, shPath, goodNoopCommand(t)), ctx
 			},
 			nil,
 		},
@@ -807,7 +794,7 @@ exit 1
 				ctx2, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				t.Cleanup(cancel)
 				time.Sleep(2 * time.Nanosecond)
-				return exec.CommandContext(ctx2, shPath, goodCommandPath), ctx2
+				return exec.CommandContext(ctx2, shPath, goodNoopCommand(t)), ctx2
 			},
 			&errCheck{contains: "context deadline exceeded"},
 		},
@@ -815,9 +802,84 @@ exit 1
 			"Command execution error",
 			func(t *testing.T) (*exec.Cmd, context.Context) {
 				ctx := context.Background()
-				return exec.CommandContext(ctx, shPath, badCommandPath), ctx
+				return exec.CommandContext(ctx, shPath, badNoopCommand(t)), ctx
 			},
 			&errCheck{contains: "exit status 1"},
+		},
+	}
+
+	exs := []commandExecutor{
+		&interactiveExecutor{},
+		&nonInteractiveExecutor{},
+	}
+
+	descStringAddOn := func(ex commandExecutor) string {
+		switch ex.(type) {
+		case *interactiveExecutor:
+			return " interactive"
+		case *nonInteractiveExecutor:
+			return " non-interactive"
+		default:
+			return ""
+		}
+	}
+
+	for _, tc := range testCases {
+		for _, ex := range exs {
+			t.Run(
+				tc.description+descStringAddOn(ex),
+				func(t *testing.T) {
+					cmd, ctx := tc.testCommandAndContext(t)
+					err := ex.executeCommand(ctx, cmd)
+					assert.True(t, tc.err.containsErr(err))
+				},
+			)
+		}
+	}
+}
+
+/*
+// TODO test
+// Mock authNeeded, or regular error, or it works, or timeout
+func (n *nonInteractiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) error {
+Cases:
+1. Good run
+2. Auth needed
+3. General
+
+*/
+
+func TestNoninteractiveExecutorExecuteCommand(t *testing.T) {
+	// Find sh on the PATH
+	shPath, err := exec.LookPath("sh")
+	if err != nil {
+		t.Error("Couldn't find sh on PATH. These tests will fail")
+	}
+
+	type testCase struct {
+		description           string
+		testCommandAndContext func(t *testing.T) (*exec.Cmd, context.Context)
+		err                   *errCheck
+	}
+
+	// This is a slice of testCases just in case we want to add more later
+	testCases := []testCase{
+		{
+			"Auth needed error",
+			func(t *testing.T) (*exec.Cmd, context.Context) {
+				ctx := context.Background()
+				// Create a command that exits with code 2 to simulate auth needed
+				temp := t.TempDir()
+				authNeededCommandPath := path.Join(temp, "authNeededCommand")
+				os.WriteFile(authNeededCommandPath, []byte(`
+#!/bin/bash
+echo "Authentication needed for this command (test)"
+exit 2
+`), 0755)
+				return exec.CommandContext(ctx, shPath, authNeededCommandPath), ctx
+
+			},
+			&errCheck{contains: "authentication needed"},
 		},
 	}
 
@@ -826,7 +888,7 @@ exit 1
 			tc.description,
 			func(t *testing.T) {
 				cmd, ctx := tc.testCommandAndContext(t)
-				executor := &interactiveExecutor{}
+				executor := &nonInteractiveExecutor{}
 				err := executor.executeCommand(ctx, cmd)
 				assert.True(t, tc.err.containsErr(err))
 			},
@@ -846,4 +908,32 @@ func (e *errCheck) containsErr(err error) bool {
 	}
 	// For non-nil e, err must be non-nil and contain the string
 	return err != nil && strings.Contains(err.Error(), e.contains)
+}
+
+func goodNoopCommand(t *testing.T) string {
+	t.Helper()
+	temp := t.TempDir()
+	goodCommandPath := path.Join(temp, "goodCommand")
+
+	// Create a good command that just exits 0
+	os.WriteFile(goodCommandPath, []byte(`
+#!/bin/bash
+exit 0
+`), 0755)
+
+	return goodCommandPath
+}
+
+func badNoopCommand(t *testing.T) string {
+	t.Helper()
+	temp := t.TempDir()
+	badCommandPath := path.Join(temp, "goodCommand")
+
+	// Create a bad command that just exits 0
+	os.WriteFile(badCommandPath, []byte(`
+#!/bin/bash
+exit 1
+`), 0755)
+
+	return badCommandPath
 }

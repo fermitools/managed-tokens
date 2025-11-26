@@ -457,7 +457,6 @@ func (i *interactiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) e
 	return nil
 }
 
-// TODO test
 // Mock authNeeded, or regular error, or it works, or timeout
 func (n *nonInteractiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "vaultToken.nonInteractiveExecutor.executeCommand")
