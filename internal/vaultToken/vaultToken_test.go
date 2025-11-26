@@ -586,12 +586,19 @@ func TestHtgettokenClientPrepareCmdArgs(t *testing.T) {
 }
 
 func TestHtgettokenClientGetToken(t *testing.T) {
+	// Outfile to use for token tests
+	outfilePath := path.Join(t.TempDir(), "htgettoken_test_token")
+
+	// A bit of a hacky way to get our byte slice to check against
+	goodBytes, cleanup := mockHtgettoken(t, outfilePath, 0)
+	cleanup()
 
 	type testCase struct {
 		description             string
 		interactive             bool
 		cancelContext           bool
 		setupMockHtgettokenFunc func(*testing.T) (cleanupFunc func())
+		expectedToken           []byte
 		expectedError           *errCheck
 	}
 
@@ -601,9 +608,10 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 			false,
 			false,
 			func(t *testing.T) func() {
-				cleanup := mockHtgettoken(t, 0)
+				_, cleanup := mockHtgettoken(t, outfilePath, 0)
 				return cleanup
 			},
+			goodBytes,
 			nil,
 		},
 		{
@@ -611,9 +619,10 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 			false,
 			true,
 			func(t *testing.T) func() {
-				cleanup := mockHtgettoken(t, 0)
+				_, cleanup := mockHtgettoken(t, outfilePath, 0)
 				return cleanup
 			},
+			nil,
 			&errCheck{contains: "context canceled before getting token"},
 		},
 		{
@@ -621,9 +630,10 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 			true,
 			false,
 			func(t *testing.T) (cleanupFunc func()) {
-				cleanup := mockHtgettoken(t, 1)
+				_, cleanup := mockHtgettoken(t, outfilePath, 1)
 				return cleanup
 			},
+			nil,
 			&errCheck{contains: "error running htgettoken to obtain bearer token"},
 		},
 		{
@@ -631,9 +641,10 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 			false,
 			false,
 			func(t *testing.T) (cleanupFunc func()) {
-				cleanup := mockHtgettoken(t, 2)
+				_, cleanup := mockHtgettoken(t, outfilePath, 2)
 				return cleanup
 			},
+			nil,
 			&errCheck{contains: "error running htgettoken to obtain bearer token"},
 		},
 	}
@@ -648,7 +659,7 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 				h, _ := NewHtgettokenClient(
 					"https://vault.example.com",
 					"/path/to/vault_token_file",
-					"/path/to/output_file",
+					outfilePath,
 					&environment.CommandEnvironment{},
 				)
 				ctx, cancel := context.WithCancel(context.Background())
@@ -656,7 +667,8 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 					cancel()
 				}
 				defer cancel()
-				err := h.GetToken(ctx, "issuer_example", "role_example", tc.interactive)
+				tokenBytes, err := h.GetToken(ctx, "issuer_example", "role_example", tc.interactive)
+				assert.Equal(t, tc.expectedToken, tokenBytes)
 				assert.True(t, tc.expectedError.containsErr(err))
 				// Note: We don't care about the token check for this test, so the warnings will not cause test failures
 			},
@@ -665,16 +677,24 @@ func TestHtgettokenClientGetToken(t *testing.T) {
 }
 
 // Mock command that simulates successful htgettoken execution with exitCode given
-func mockHtgettoken(t *testing.T, exitCode uint) (cleanupFunc func()) {
+func mockHtgettoken(t *testing.T, outfile string, exitCode uint) (tokenBytes []byte, cleanupFunc func()) {
 	t.Helper()
 
 	temp := t.TempDir()
-	fakeHtgettokenPath := fmt.Sprintf("%s/htgettoken", temp)
+	fakeHtgettokenPath := path.Join(temp, "htgettoken")
 	scriptContent := fmt.Sprintf(`#!/bin/bash
 echo "Fake htgettoken executed"
 exit %d
 `, exitCode)
 	os.WriteFile(fakeHtgettokenPath, []byte(scriptContent), 0755)
+
+	var fakeTokenBytes []byte = nil
+	if exitCode == 0 {
+		// Also create a fake bearer token file
+		fakeTokenContent := "12345abcde"
+		os.WriteFile(outfile, []byte(fakeTokenContent), 0644)
+		fakeTokenBytes = []byte(fakeTokenContent)
+	}
 
 	oldPath, ok := vaultExecutables["htgettoken"]
 	vaultExecutables["htgettoken"] = fakeHtgettokenPath
@@ -683,8 +703,11 @@ exit %d
 		if ok {
 			vaultExecutables["htgettoken"] = oldPath
 		}
+		if exitCode == 0 {
+			os.Remove(outfile)
+		}
 	}
-	return cleanupFunc
+	return fakeTokenBytes, cleanupFunc
 }
 
 func TestCheckToken(t *testing.T) {
@@ -837,17 +860,6 @@ func TestExecutorExecuteCommand(t *testing.T) {
 		}
 	}
 }
-
-/*
-// TODO test
-// Mock authNeeded, or regular error, or it works, or timeout
-func (n *nonInteractiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd) error {
-Cases:
-1. Good run
-2. Auth needed
-3. General
-
-*/
 
 func TestNoninteractiveExecutorExecuteCommand(t *testing.T) {
 	// Find sh on the PATH

@@ -199,38 +199,8 @@ func validateVaultToken(vaultTokenFilename string) error {
 	return nil
 }
 
-// // TODO STILL UNDER DEVELOPMENT.  Export when ready, and add tracing
-// func GetToken(ctx context.Context, userPrincipal, serviceName, vaultServer string, environ environment.CommandEnvironment) error {
-// 	htgettokenArgs := []string{
-// 		"-d",
-// 		"-a",
-// 		vaultServer,
-// 		"-i",
-// 		serviceName,
-// 	}
-
-// 	htgettokenCmd := environment.EnvironmentWrappedCommand(ctx, &environ, vaultExecutables["htgettoken"], htgettokenArgs...)
-// 	// TODO Get rid of all this when it works
-// 	htgettokenCmd.Stdout = os.Stdout
-// 	htgettokenCmd.Stderr = os.Stderr
-// 	log.Debug(htgettokenCmd.Args)
-
-// 	log.WithField("service", serviceName).Info("Running htgettoken to get vault and bearer tokens")
-// 	if stdoutStderr, err := htgettokenCmd.CombinedOutput(); err != nil {
-// 		if ctx.Err() == context.DeadlineExceeded {
-// 			log.WithField("service", serviceName).Error("Context timeout")
-// 			return ctx.Err()
-// 		}
-// 		log.WithField("service", serviceName).Errorf("Could not get vault token:\n%s", string(stdoutStderr[:]))
-// 		return err
-// 	}
-
-// 	log.WithField("service", serviceName).Debug("Successfully got vault token")
-// 	return nil
-// }
-
 // Notes:
-// 1. getDefaultVaultTokenLocation is already defined above and gets the vault token location we need
+// 1. getDefaultVaultTokenLocation is already defined above and gets the vault token location we need -- DONE
 // 2. Add worker type "GetTokenWorker" to just get token.  It will have to instantiate the htgettokenClient, move in the staged vault token,
 //   call GetToken, and then validate the token.
 //  The worker can just throw out the BEARER TOKEN, so we can write the token to a tempfile and delete it after validation
@@ -240,14 +210,6 @@ func validateVaultToken(vaultTokenFilename string) error {
 // From caller POV:
 // c := NewHtgettokenClient(stuff)
 // err := GetToken(ctx, stuff, c)
-
-// OR:
-//// func NewHtgettokenClient(stuff any) HtgettokenClient { }
-// func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string) error {
-// 		Setup
-//    Logic to handle interactive or not
-//
-// }
 
 // Heavily borrowed from https://github.com/fnal-fife/jobsub-pnfs-dropbox-cleanup/blob/5168a5d0fc30284fa22350bcee42e55687f532eb/htgettokenClient.go
 
@@ -309,7 +271,7 @@ func (h *HtgettokenClient) WithVerbose() *HtgettokenClient {
 	return h
 }
 
-func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, interactive bool) error {
+func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, interactive bool) ([]byte, error) {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "vaultToken.HtgettokenClient.GetToken")
 	span.SetAttributes(
 		attribute.String("issuer", issuer),
@@ -322,9 +284,9 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 		if errors.Is(err, context.Canceled) {
 			msg = "context canceled before getting token"
 			funcLogger.Error(msg, " error:", err)
-			return fmt.Errorf("%s: %w", msg, err)
+			return nil, fmt.Errorf("%s: %w", msg, err)
 		}
-		return fmt.Errorf("%s: %w", msg, err)
+		return nil, fmt.Errorf("%s: %w", msg, err)
 	}
 
 	var runner commandExecutor = &nonInteractiveExecutor{} // By default, use non-interactive executor
@@ -339,7 +301,7 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 
 	err := runner.executeCommand(ctx, cmd)
 	if err != nil {
-		return fmt.Errorf("error running htgettoken to obtain bearer token: %w", err)
+		return nil, fmt.Errorf("error running htgettoken to obtain bearer token: %w", err)
 	}
 
 	// Check token - if there's an error here, we want the warning, but not to stop execution
@@ -347,7 +309,12 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 		funcLogger.Warn("error checking token", "tokenfile", h.outFile, "error", err)
 	}
 
-	return nil
+	tokenBytes, err := os.ReadFile(h.outFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading token outfile: %w", err)
+	}
+
+	return tokenBytes, nil
 }
 
 func (h *HtgettokenClient) prepareCmdArgs(issuer, role string) []string {
