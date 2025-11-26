@@ -310,6 +310,12 @@ func (h *HtgettokenClient) WithVerbose() *HtgettokenClient {
 }
 
 func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, interactive bool) error {
+	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "vaultToken.HtgettokenClient.GetToken")
+	span.SetAttributes(
+		attribute.String("issuer", issuer),
+		attribute.String("role", role),
+	)
+	defer span.End()
 	funcLogger := log.WithField("caller", "HtgettokenClient.GetToken")
 	if err := ctx.Err(); err != nil {
 		msg := "context deadline exceeded before getting token"
