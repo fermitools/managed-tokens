@@ -28,8 +28,6 @@ const (
 	badhost  string = "thisisafakehostandwillneverbeusedever.example.com"
 )
 
-var ctx context.Context = context.Background()
-
 type goodNode string
 
 func (g goodNode) Ping(ctx context.Context, extraPingOpts []string) error {
@@ -61,12 +59,11 @@ func TestPingAllNodes(t *testing.T) {
 	var successCount, failureCount int
 	numGood := 2
 	numBad := 1
-	ctx := context.Background()
 	if testing.Verbose() {
 		t.Logf("Ping all nodes - %d good, %d bad", numGood, numBad)
 	}
 	extraPingOpts := make([]string, 0)
-	pingChannel := pingAllNodes(ctx, extraPingOpts, goodNode(""), badNode(badhost), goodNode(""))
+	pingChannel := pingAllNodes(context.Background(), extraPingOpts, goodNode(""), badNode(badhost), goodNode(""))
 	for n := range pingChannel {
 		if n.err != nil {
 			failureCount++
@@ -85,7 +82,7 @@ func TestPingAllNodesTimeout(t *testing.T) {
 	if testing.Verbose() {
 		t.Log("Running timeout test")
 	}
-	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, time.Duration(1*time.Nanosecond))
+	timeoutCtx, cancelTimeout := context.WithTimeout(context.Background(), time.Duration(1*time.Nanosecond))
 	extraArgs := make([]string, 0)
 	pingChannel := pingAllNodes(timeoutCtx, extraArgs, badNode(""), badNode(badhost))
 	for n := range pingChannel {
