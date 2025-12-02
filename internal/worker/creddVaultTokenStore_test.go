@@ -29,22 +29,30 @@ import (
 func TestGetServiceTokenForCreddLocation(t *testing.T) {
 	curUser, _ := user.Current()
 	uid := curUser.Uid
-	credd := "mycredd"
+	testCredd := "mycredd"
 	service := "my_service"
 
 	type testCase struct {
 		tokenRootPath string
+		credd         string
 		expected      string
 	}
 
 	testCases := []testCase{
 		{
 			"/path/to/rootdir/",
-			fmt.Sprintf("/path/to/rootdir/vt_u%s-%s-%s", uid, credd, service),
+			"",
+			fmt.Sprintf("/path/to/rootdir/vt_u%s-%s", uid, service),
+		},
+		{
+			"/path/to/rootdir/",
+			testCredd,
+			fmt.Sprintf("/path/to/rootdir/vt_u%s-%s-%s", uid, testCredd, service),
 		},
 		{
 			"/path/to/rootdir2/",
-			fmt.Sprintf("/path/to/rootdir2/vt_u%s-%s-%s", uid, credd, service),
+			testCredd,
+			fmt.Sprintf("/path/to/rootdir2/vt_u%s-%s-%s", uid, testCredd, service),
 		},
 	}
 
@@ -52,7 +60,7 @@ func TestGetServiceTokenForCreddLocation(t *testing.T) {
 		t.Run(
 			fmt.Sprintf("test%d", idx),
 			func(t *testing.T) {
-				assert.Equal(t, test.expected, getServiceTokenForCreddLocation(test.tokenRootPath, "my_service", "mycredd"))
+				assert.Equal(t, test.expected, getServiceTokenForCreddLocation(test.tokenRootPath, service, test.credd))
 			},
 		)
 	}

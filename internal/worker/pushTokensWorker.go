@@ -443,22 +443,25 @@ func prepareDefaultRoleFile(sc *Config) (string, error) {
 
 // findFirstCreddVaultToken will cycle through the credds slice in an order determined by slices.Sort() and attempt to find a stored vault token for
 // a credd at the tokenRootPath.  If this fails, it will return the location used by condor_vault_storer to store tokens
+// If the vault token was not stored in a credd, give nil as the value of credds.  Giving {}string[] will cause findFirstCreddVaultToken to return an error
 func findFirstCreddVaultToken(tokenRootPath, serviceName string, credds []string) (string, error) {
 	funcLogger := log.WithField("service", serviceName)
 
-	if len(credds) == 0 {
+	if len(credds) == 0 && credds != nil {
 		return "", errors.New("no credds given")
 	}
 
 	creddsSorted := make([]string, len(credds))
-	copy(creddsSorted, credds)
-	slices.Sort(creddsSorted)
+	if credds == nil {
+		creddsSorted = append(creddsSorted, "")
+	} else {
+		copy(creddsSorted, credds)
+		slices.Sort(creddsSorted)
+	}
 
 	// Check each possible credd path for the token file.  If we find one, use it
-	for i := 0; i < len(creddsSorted); i++ {
-		trialCredd := creddsSorted[i]
+	for _, trialCredd := range creddsSorted {
 		trialPath := getServiceTokenForCreddLocation(tokenRootPath, serviceName, trialCredd)
-
 		if _, err := os.Stat(trialPath); err == nil {
 			funcLogger.WithFields(log.Fields{
 				"credd":     trialCredd,

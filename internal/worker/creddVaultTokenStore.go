@@ -184,6 +184,11 @@ func getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd string) s
 		uid = currentUser.Uid
 	}
 
+	if credd == "" {
+		tokenFilename := fmt.Sprintf("vt_u%s-%s", uid, serviceName)
+		return path.Join(tokenRootPath, tokenFilename)
+	}
+
 	tokenFilename := fmt.Sprintf("vt_u%s-%s-%s", uid, credd, serviceName)
 	return path.Join(tokenRootPath, tokenFilename)
 }

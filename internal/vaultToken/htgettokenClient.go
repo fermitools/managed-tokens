@@ -40,6 +40,7 @@ import (
 //  The worker can just throw out the BEARER TOKEN, so we can write the token to a tempfile and delete it after validation
 // 3.  Maybe all the workers could be combined into an interface, with a type switch to determine which worker to use?
 // 4. CondorVaultTokenLocation is defined here and in the worker package.  We only need it here?, and export it perhaps
+// 5. Note - if we get a token with htgettoken, NOT for a schedd, we should save it
 
 // From caller POV:
 // c := NewHtgettokenClient(stuff)
