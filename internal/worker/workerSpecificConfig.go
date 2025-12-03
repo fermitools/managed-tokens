@@ -29,6 +29,13 @@ const (
 	NumRetriesOption WorkerSpecificConfigOption = iota
 	// RetrySleepOption is a worker-specific configuration option that represents the time.Duration a worker should sleep between retries
 	RetrySleepOption
+	// InteractiveTokenGetterOption is a worker-specific configuration option that represents whether the token getter should be interactive.
+	// It is supported by the GetTokenWorkerType and StoreAndGetTokenWorkerType worker types
+	InteractiveTokenGetterOption
+	// AlternateTokenGetterOption is a worker-specific configuration option that represents whether to use an alternate token getter. It is
+	// supported by the GetTokenWorkerType and StoreAndGetTokenWorkerType worker types, and the value of the AlternateTokenGetterOption must
+	// be of a type that implements the TokenGetter interface.
+	AlternateTokenGetterOption
 	invalidWorkerSpecificConfigOption
 )
 
@@ -94,6 +101,54 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 	}
 
 	return valTime, nil
+}
+
+// getInteractiveTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
+// If the worker type is not supported or invalid, an error is returned.
+func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, error) {
+	if !isValidWorkerType(w) {
+		return false, errors.New("invalid worker type")
+	}
+
+	if w != GetTokenWorkerType && w != StoreAndGetTokenWorkerType {
+		return false, fmt.Errorf("workerType %s does not support the InteractiveTokenGetterOption", w)
+	}
+
+	val, ok := c.workerSpecificConfig[w]
+	if !ok {
+		return false, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
+	}
+
+	valBool, ok := val[InteractiveTokenGetterOption].(bool)
+	if !ok {
+		return false, fmt.Errorf("value for workerType %s is not of type bool.  Got type %T", w, val)
+	}
+
+	return valBool, nil
+}
+
+// getInteractiveTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
+// If the worker type is not supported or invalid, an error is returned.
+func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGetter, error) {
+	if !isValidWorkerType(w) {
+		return nil, errors.New("invalid worker type")
+	}
+
+	if w != GetTokenWorkerType && w != StoreAndGetTokenWorkerType {
+		return nil, fmt.Errorf("workerType %s does not support the AlternateTokenGetterOption", w)
+	}
+
+	val, ok := c.workerSpecificConfig[w]
+	if !ok {
+		return nil, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
+	}
+
+	valInterface, ok := val[AlternateTokenGetterOption].(TokenGetter)
+	if !ok {
+		return nil, fmt.Errorf("value for workerType %s is not of type tokenGetter.  Got type %T", w, val)
+	}
+
+	return valInterface, nil
 }
 
 func isValidWorkerSpecificConfigOption(option WorkerSpecificConfigOption) bool {
