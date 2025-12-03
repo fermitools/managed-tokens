@@ -21,6 +21,7 @@ type WorkerType uint8
 
 const (
 	GetKerberosTicketsWorkerType WorkerType = iota
+	GetTokenWorkerType
 	StoreAndGetTokenWorkerType
 	StoreAndGetTokenInteractiveWorkerType
 	PingAggregatorWorkerType
@@ -32,6 +33,8 @@ func (wt WorkerType) String() string {
 	switch wt {
 	case GetKerberosTicketsWorkerType:
 		return "GetKerberosTickets"
+	case GetTokenWorkerType:
+		return "GetToken"
 	case StoreAndGetTokenWorkerType:
 		return "StoreAndGetToken"
 	case StoreAndGetTokenInteractiveWorkerType:
