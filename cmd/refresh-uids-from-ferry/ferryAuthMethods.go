@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"os"
 	"path"
@@ -163,14 +164,28 @@ func withKerberosJWTAuth(serviceConfig *worker.Config) func() func(context.Conte
 			)
 			defer span.End()
 
+			bearerTokenFile, err := os.CreateTemp(os.TempDir(), "managed_tokens_ferry_jwt_auth_")
+			if err != nil {
+				tracing.LogErrorWithTrace(span, exeLogger, "Could not create temp file for bearer token to use for ferry jwt auth")
+				return &http.Response{}, err
+			}
+			defer os.Remove(bearerTokenFile.Name())
+
 			// Get our bearer token and locate it
-			if err := vaultToken.GetToken(
-				ctx,
-				serviceConfig.Service.Name(),
-				serviceConfig.UserPrincipal,
-				viper.GetString("ferry.vaultServer"),
-				serviceConfig.CommandEnvironment,
-			); err != nil {
+			h, err := vaultToken.NewHtgettokenClient(
+				serviceConfig.VaultServer,
+				viper.GetString("serviceCreddVaultTokenPathRoot"),
+				bearerTokenFile.Name(),
+				&serviceConfig.CommandEnvironment,
+			)
+			if err != nil {
+				err2 := fmt.Errorf("could not create htgettoken client: %w", err)
+				tracing.LogErrorWithTrace(span, exeLogger, err2.Error())
+				return &http.Response{}, err2
+			}
+
+			bearerToken, err := h.GetToken(ctx, serviceConfig.Service.Experiment(), serviceConfig.Service.Role(), false)
+			if err != nil {
 				tracing.LogErrorWithTrace(span, exeLogger, "Could not get token to authenticate to FERRY",
 					tracing.KeyValueForLog{Key: "service", Value: serviceConfig.Service.Name()},
 					tracing.KeyValueForLog{Key: "userPrincipal", Value: serviceConfig.UserPrincipal},
@@ -179,34 +194,14 @@ func withKerberosJWTAuth(serviceConfig *worker.Config) func() func(context.Conte
 				return &http.Response{}, err
 			}
 
-			bearerTokenDefaultLocation, err := getBearerTokenDefaultLocation()
-			if err != nil {
-				tracing.LogErrorWithTrace(span, exeLogger, "Could not get default location for bearer tokens")
-				return &http.Response{}, err
-			}
-			defer func() {
-				if err := os.Remove(bearerTokenDefaultLocation); err != nil {
-					log.Error("Could not remove bearer token file")
-				}
-				log.Info("Removed bearer token file")
-			}()
-
-			bearerBytes, err := os.ReadFile(bearerTokenDefaultLocation)
-			if err != nil {
-				tracing.LogErrorWithTrace(span, exeLogger, "Could not open bearer token file for reading",
-					tracing.KeyValueForLog{Key: "bearerTokenFileLocation", Value: bearerTokenDefaultLocation},
-				)
-				return &http.Response{}, err
-			}
-
 			// Validate token
-			if _, err := jwtLib.Parse(bearerBytes); err != nil {
+			if _, err := jwtLib.Parse(bearerToken); err != nil {
 				tracing.LogErrorWithTrace(span, exeLogger, "Token validation failed: not a valid bearer (JWT) token",
-					tracing.KeyValueForLog{Key: "bearerTokenFileLocation", Value: bearerTokenDefaultLocation})
+					tracing.KeyValueForLog{Key: "bearerTokenFileLocation", Value: bearerTokenFile.Name()})
 				return &http.Response{}, err
 			}
 
-			tokenStringRaw := string(bearerBytes[:])
+			tokenStringRaw := string(bearerToken[:])
 			tokenString := strings.TrimSuffix(tokenStringRaw, "\n")
 
 			bearerHeader := "Bearer " + tokenString
