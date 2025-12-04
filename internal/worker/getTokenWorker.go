@@ -142,6 +142,11 @@ type tokenGetterConfig struct {
 	environ       *environment.CommandEnvironment
 }
 
+// GetToken gets a vault token for the serviceName defined in the tokenGetterConfig and stores it in the proper location.
+// It will first try to use an existing vault token at the proper location (by default, t.tokenRootPath/vt_u<uid>_<serviceName>), and
+// either leave that token undisturbed, or renew the vault token at that location.
+// If that token does not exist, it will create a new vault token and install it at that location
+// It will return an error if either a new token cannot be generated for some reason, or if the existing token cannot be renewed.
 func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.StoreAndGetTokensForSchedd")
 	span.SetAttributes(attribute.String("tokenRootPath", t.tokenRootPath))

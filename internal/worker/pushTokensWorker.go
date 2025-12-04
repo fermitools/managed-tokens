@@ -41,6 +41,7 @@ import (
 	"github.com/fermitools/managed-tokens/internal/notifications"
 	"github.com/fermitools/managed-tokens/internal/service"
 	"github.com/fermitools/managed-tokens/internal/tracing"
+	"github.com/fermitools/managed-tokens/internal/vaultToken"
 )
 
 // Sleep time between each retry
@@ -472,7 +473,7 @@ func findFirstCreddVaultToken(tokenRootPath, serviceName string, credds []string
 	}
 
 	// We didn't find a usable vault token at the tokenRootPath, so try /tmp for a condor vault token
-	trialPath := getCondorVaultTokenLocation(serviceName)
+	trialPath := vaultToken.GetCondorVaultTokenLocation(serviceName)
 	if _, err := os.Stat(trialPath); err == nil {
 		funcLogger.WithFields(log.Fields{
 			"tokenPath": trialPath,

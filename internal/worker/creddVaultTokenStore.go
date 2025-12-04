@@ -25,6 +25,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/fermitools/managed-tokens/internal/vaultToken"
 )
 
 // These are functions that deal with staging and storing credd-specific vault tokens
@@ -40,7 +42,7 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 	restorePriorTokenFunc = func() error { return nil }
 
 	// Check for token at condorVaultTokenLocation, and move it out if needed
-	condorVaultTokenLocation := getCondorVaultTokenLocation(serviceName)
+	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
 	// TODO Strengthen this file check.  One more func that checks if a file exists or not, maybe goes into utils
 	if _, err := os.Stat(condorVaultTokenLocation); !errors.Is(err, os.ErrNotExist) {
 		if err != nil {
@@ -98,7 +100,7 @@ func stageStoredTokenFile(tokenRootPath, serviceName, credd string) error {
 		"service": serviceName,
 		"credd":   credd,
 	})
-	condorVaultTokenLocation := getCondorVaultTokenLocation(serviceName)
+	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
 
 	storedServiceCreddTokenLocation := getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd)
 	if _, err := os.Stat(storedServiceCreddTokenLocation); errors.Is(err, os.ErrNotExist) {
@@ -136,7 +138,7 @@ func storeServiceTokenForCreddFile(tokenRootPath, serviceName, credd string) err
 		"service": serviceName,
 		"credd":   credd,
 	})
-	condorVaultTokenLocation := getCondorVaultTokenLocation(serviceName)
+	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
 	storedServiceCreddTokenLocation := getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd)
 
 	funcLogger.Debug("Attempting to move condor vault token to service-credd vault token storage path")
@@ -153,20 +155,6 @@ func storeServiceTokenForCreddFile(tokenRootPath, serviceName, credd string) err
 	}
 	funcLogger.Infof("Successfully moved condor vault token to service-credd vault storage path: %s", storedServiceCreddTokenLocation)
 	return nil
-}
-
-// getCondorVaultTokenLocation returns the location of vault token that HTCondor uses based on the current user's UID
-func getCondorVaultTokenLocation(serviceName string) string {
-	var uid string
-	currentUser, err := user.Current()
-	if err != nil {
-		log.WithField("service", serviceName).Error(`Could not get current user.  Will use string "000" instead`)
-		uid = "000"
-	} else {
-		uid = currentUser.Uid
-	}
-	filename := fmt.Sprintf("vt_u%s-%s", uid, serviceName)
-	return path.Join(os.TempDir(), filename)
 }
 
 func getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd string) string {

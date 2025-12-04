@@ -289,7 +289,7 @@ func StoreAndGetTokensForSchedd[T tokenStorer](ctx context.Context, environ *env
 	// Stage prior vault token, if it exists
 	restorePriorTokenFunc, err := backupCondorVaultToken(ts.GetServiceName())
 	if err != nil {
-		funcLogger.Errorf("Error backing up current vault token at %s.  Will overwrite this with a new vault token.", getCondorVaultTokenLocation(ts.GetServiceName()))
+		funcLogger.Errorf("Error backing up current vault token at %s.  Will overwrite this with a new vault token.", vaultToken.GetCondorVaultTokenLocation(ts.GetServiceName()))
 	}
 	defer func() {
 		if err := restorePriorTokenFunc(); err != nil {

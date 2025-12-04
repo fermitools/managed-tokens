@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/fermitools/managed-tokens/internal/service"
+	"github.com/fermitools/managed-tokens/internal/vaultToken"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -224,7 +225,7 @@ func TestFindFirstCreddVaultToken(t *testing.T) {
 		{
 			"If not, should give /tmp location",
 			func() func() {
-				expectedPath := getCondorVaultTokenLocation(serviceName)
+				expectedPath := vaultToken.GetCondorVaultTokenLocation(serviceName)
 				if _, err := os.Create(expectedPath); err != nil {
 					t.FailNow()
 				}
@@ -232,7 +233,7 @@ func TestFindFirstCreddVaultToken(t *testing.T) {
 			},
 			os.DevNull,
 			[]string{"credd01", "credd02", "a02"},
-			getCondorVaultTokenLocation(serviceName),
+			vaultToken.GetCondorVaultTokenLocation(serviceName),
 			true,
 		},
 		{

@@ -51,7 +51,7 @@ func TestIsValidWorkerSpecificConfigOption(t *testing.T) {
 	assert.True(t, validOption)
 
 	// Test case: Invalid worker specific config option
-	invalidOption := isValidWorkerSpecificConfigOption(WorkerSpecificConfigOption(2))
+	invalidOption := isValidWorkerSpecificConfigOption(WorkerSpecificConfigOption(invalidWorkerSpecificConfigOption))
 	assert.False(t, invalidOption)
 }
 
