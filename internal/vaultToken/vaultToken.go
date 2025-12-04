@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -72,11 +74,7 @@ func GetAllVaultTokenLocations(serviceName string) ([]string, error) {
 		vaultTokenLocations = append(vaultTokenLocations, defaultLocation)
 	}
 
-	condorLocation, err := getCondorVaultTokenLocation(serviceName)
-	if err != nil {
-		funcLogger.Error("Could not get condor vault location")
-		return nil, err
-	}
+	condorLocation := GetCondorVaultTokenLocation(serviceName)
 	if _, err := os.Stat(condorLocation); err == nil { // Check to see if the file exists and we can read it
 		vaultTokenLocations = append(vaultTokenLocations, condorLocation)
 	}
@@ -109,15 +107,20 @@ func RemoveServiceVaultTokens(serviceName string) error {
 	return nil
 }
 
-// getCondorVaultTokenLocation returns the location of vault token that HTCondor uses based on the current user's UID
-func getCondorVaultTokenLocation(serviceName string) (string, error) {
+// GetCondorVaultTokenLocation returns the location of vault token that HTCondor uses based on the current user's UID
+// If for some reason the current user cannot be determined, we will fall back to using os.GetUid(), but that doesn't cache the user info,
+// which is why user.Current() is preferred.
+func GetCondorVaultTokenLocation(serviceName string) string {
+	var uid string
 	currentUser, err := user.Current()
 	if err != nil {
-		log.WithField("service", serviceName).Error(err)
-		return "", err
+		log.WithField("service", serviceName).Debug("Could not get current user. Will attempt again using os.Getuid().")
+		uid = strconv.Itoa(os.Getuid())
+	} else {
+		uid = currentUser.Uid
 	}
-	currentUID := currentUser.Uid
-	return fmt.Sprintf("/tmp/vt_u%s-%s", currentUID, serviceName), nil
+	filename := fmt.Sprintf("vt_u%s-%s", uid, serviceName)
+	return path.Join(os.TempDir(), filename)
 }
 
 // getDefaultVaultTokenLocation returns the location of vault token that most OSG grid tools use based on the current user's UID
@@ -133,12 +136,8 @@ func getDefaultVaultTokenLocation() (string, error) {
 
 func validateServiceVaultToken(serviceName string) error {
 	funcLogger := log.WithField("service", serviceName)
-	vaultTokenFilename, err := getCondorVaultTokenLocation(serviceName)
-	if err != nil {
-		funcLogger.Error("Could not get default vault token location")
-		return err
-	}
 
+	vaultTokenFilename := GetCondorVaultTokenLocation(serviceName)
 	if err := validateVaultToken(vaultTokenFilename); err != nil {
 		funcLogger.Error("Could not validate vault token")
 		return err

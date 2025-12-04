@@ -155,7 +155,7 @@ func TestValidateServiceVaultToken(t *testing.T) {
 			"Valid vault token, service can be found",
 			serviceName,
 			func() string {
-				tokenFileName, _ := getCondorVaultTokenLocation(serviceName)
+				tokenFileName := GetCondorVaultTokenLocation(serviceName)
 				b := []byte(validTokenString)
 				os.WriteFile(tokenFileName, b, 0644)
 				return tokenFileName
@@ -193,7 +193,7 @@ func TestValidateServiceVaultToken(t *testing.T) {
 			"invalid vault token, service can be found",
 			serviceName,
 			func() string {
-				tokenFileName, _ := getCondorVaultTokenLocation(serviceName)
+				tokenFileName := GetCondorVaultTokenLocation(serviceName)
 				b := []byte(invalidTokenString)
 				os.WriteFile(tokenFileName, b, 0644)
 				return tokenFileName
@@ -232,11 +232,7 @@ func TestGetCondorVaultTokenLocation(t *testing.T) {
 	uid := currentUser.Uid
 	serviceName := "myService"
 	expectedResult := fmt.Sprintf("/tmp/vt_u%s-%s", uid, serviceName)
-	result, err := getCondorVaultTokenLocation(serviceName)
-	if err != nil {
-		t.Errorf("Expected nil error.  Got %s", err)
-	}
-	if result != expectedResult {
+	if result := GetCondorVaultTokenLocation(serviceName); result != expectedResult {
 		t.Errorf("Got wrong result for condor vault token location.  Expected %s, got %s", expectedResult, result)
 	}
 }
