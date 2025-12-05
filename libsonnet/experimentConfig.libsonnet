@@ -9,6 +9,7 @@ local supportedOverrides = [
     "condorScheddConstraintOverride",
     "defaultRoleFileDestinationTemplateOverride",
     "disableNotificationsOverride",
+    "tokenGetterOverride"
 ];
 
 {

@@ -1370,3 +1370,115 @@ func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
 		})
 	}
 }
+func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
+	configPath := "configroot"
+
+	type testCase struct {
+		description      string
+		overrideValue    string
+		expectedType     tokenGetterWorkerType
+		expectedOverride bool
+		setupFunc        func()
+	}
+
+	testCases := []testCase{
+		{
+			description:      "No override key set, should return default",
+			overrideValue:    "",
+			expectedType:     storeAndGetTokenWorkerType,
+			expectedOverride: false,
+			setupFunc:        func() {},
+		},
+		{
+			description:      "Valid override: storeAndGetToken",
+			overrideValue:    "storeAndGetToken",
+			expectedType:     storeAndGetTokenWorkerType,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "storeAndGetToken")
+			},
+		},
+		{
+			description:      "Valid override: storeAndGetTokenInteractive",
+			overrideValue:    "storeAndGetTokenInteractive",
+			expectedType:     storeAndGetTokenInteractiveWorkerType,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "storeAndGetTokenInteractive")
+			},
+		},
+		{
+			description:      "Valid override: getToken",
+			overrideValue:    "getToken",
+			expectedType:     getTokenWorkerType,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "getToken")
+			},
+		},
+		{
+			description:      "Invalid override value, should return default",
+			overrideValue:    "InvalidType",
+			expectedType:     storeAndGetTokenWorkerType,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "InvalidType")
+			},
+		},
+		{
+			description:      "Empty override value, should return default",
+			overrideValue:    "",
+			expectedType:     storeAndGetTokenWorkerType,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(func() { viper.Reset() })
+			tc.setupFunc()
+			assert.Equal(t, tc.expectedType, getTokenGetterOverrideFromConfiguration(configPath))
+		})
+	}
+}
+
+func TestWorkerTypeToTokenGetterWorkerType(t *testing.T) {
+	type testCase struct {
+		description    string
+		input          worker.WorkerType
+		expectedOutput tokenGetterWorkerType
+	}
+
+	testCases := []testCase{
+		{
+			description:    "StoreAndGetTokenWorkerType maps to storeAndGetTokenWorkerType",
+			input:          worker.StoreAndGetTokenWorkerType,
+			expectedOutput: storeAndGetTokenWorkerType,
+		},
+		{
+			description:    "StoreAndGetTokenInteractiveWorkerType maps to storeAndGetTokenInteractiveWorkerType",
+			input:          worker.StoreAndGetTokenInteractiveWorkerType,
+			expectedOutput: storeAndGetTokenInteractiveWorkerType,
+		},
+		{
+			description:    "GetTokenWorkerType maps to getTokenWorkerType",
+			input:          worker.GetTokenWorkerType,
+			expectedOutput: getTokenWorkerType,
+		},
+		{
+			description:    "Unknown WorkerType maps to invalidTokenGetterWorkerType",
+			input:          worker.WorkerType(99),
+			expectedOutput: invalidTokenGetterWorkerType,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			assert.Equal(t, tc.expectedOutput, workerTypeToTokenGetterWorkerType(tc.input))
+		})
+	}
+}

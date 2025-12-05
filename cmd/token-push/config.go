@@ -382,6 +382,63 @@ func getDefaultRoleFileDestinationTemplate(configPath string) string {
 	return viper.GetString(defaultRoleFileDestinationTmplPath)
 }
 
+// tokenGetterWorkerType is an enum representing the type of token getter worker to use. It is mainly used where
+// restriction is needed of a worker type
+//
+// Note: This restriction could have been done with an interface, but that was deemed to be too complicated.
+type tokenGetterWorkerType uint8
+
+const (
+	storeAndGetTokenWorkerType tokenGetterWorkerType = iota
+	storeAndGetTokenInteractiveWorkerType
+	getTokenWorkerType
+	invalidTokenGetterWorkerType
+)
+
+func isValidTokenGetterWorkerType(t tokenGetterWorkerType) bool {
+	return t < invalidTokenGetterWorkerType
+}
+
+// workerTypeToTokenGetterWorkerType converts a worker.WorkerType to a tokenGetterWorkerType if possible
+func workerTypeToTokenGetterWorkerType(wt worker.WorkerType) tokenGetterWorkerType {
+	switch wt {
+	case worker.StoreAndGetTokenWorkerType:
+		return storeAndGetTokenWorkerType
+	case worker.StoreAndGetTokenInteractiveWorkerType:
+		return storeAndGetTokenInteractiveWorkerType
+	case worker.GetTokenWorkerType:
+		return getTokenWorkerType
+	default:
+		return invalidTokenGetterWorkerType
+	}
+}
+
+// getTokenGetterOverrideFromConfiguration checks the configuration for an overridden tokenGetterWorkerType.
+// If the override key "<configPath>.tokenGetterOverride" exists, the function validates the value, and returns
+// the corresponding tokenGetterWorkerType. If validation fails, or the override key is not set in the configuration,
+// the default of storeAndGetTokenWorkerType is returned.
+func getTokenGetterOverrideFromConfiguration(configPath string) tokenGetterWorkerType {
+	if tokenGetterOverridePath, overridden := getConfigOverridePath(configPath, "tokenGetter"); overridden {
+		// Check the configuration value against the possible valid worker type configuration strings
+		overrideValue := viper.GetString(tokenGetterOverridePath)
+		overrideWorkerType, ok := workerTypeFromConfig(viper.GetString(tokenGetterOverridePath))
+		if !ok {
+			log.Errorf("Invalid tokenGetter override value %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
+			return storeAndGetTokenWorkerType
+		}
+
+		// Then make sure that's a tokenGetterWorkerType, and return it if it is
+		overrideTokenGetterWorkerType := workerTypeToTokenGetterWorkerType(overrideWorkerType)
+		if !isValidTokenGetterWorkerType(overrideTokenGetterWorkerType) {
+			log.Errorf("Invalid tokenGetter override worker type %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
+			return storeAndGetTokenWorkerType
+		}
+
+		return overrideTokenGetterWorkerType // Use validated override value
+	}
+	return storeAndGetTokenWorkerType // Default
+}
+
 // resolveDisableNotifications checks each service's configuration to determine if notifications should be disabled.
 // It takes a slice of service objects as input and returns a boolean indicating whether admin notifications should be disabled,
 // and a slice of strings containing the names of services for which notifications should be disabled.
