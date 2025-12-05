@@ -29,6 +29,7 @@ import (
 
 var validWorkerTypes = []worker.WorkerType{
 	worker.GetKerberosTicketsWorkerType,
+	worker.GetTokenWorkerType,
 	worker.StoreAndGetTokenWorkerType,
 	worker.StoreAndGetTokenInteractiveWorkerType,
 	worker.PingAggregatorWorkerType,
@@ -40,6 +41,18 @@ func workerTypeToConfigString(wt worker.WorkerType) string {
 	s := wt.String()
 	first := strings.ToLower(s[0:1])
 	return first + s[1:]
+}
+
+// workerTypeFromConfig converts a configuration string to a WorkerType.  Callers should check the
+// ok value to see if the string was matched to a corresponding worker.WorkerType configuration string
+// before using the returned wt.WorkerType value.
+func workerTypeFromConfig(s string) (wt worker.WorkerType, ok bool) {
+	for _, wt := range validWorkerTypes {
+		if s == workerTypeToConfigString(wt) {
+			return wt, true
+		}
+	}
+	return 0, false
 }
 
 // getWorkerConfigValue retrieves the value of a worker-specific key from the configuration

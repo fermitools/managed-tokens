@@ -229,6 +229,10 @@ func TestWorkerTypeToConfigString(t *testing.T) {
 			expected:   "getKerberosTickets",
 		},
 		{
+			workerType: worker.GetTokenWorkerType,
+			expected:   "getToken",
+		},
+		{
 			workerType: worker.StoreAndGetTokenWorkerType,
 			expected:   "storeAndGetToken",
 		},
@@ -250,6 +254,84 @@ func TestWorkerTypeToConfigString(t *testing.T) {
 		t.Run(fmt.Sprintf("WorkerType: %s", test.workerType.String()), func(t *testing.T) {
 			result := workerTypeToConfigString(test.workerType)
 			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestWorkerTypeFromConfig(t *testing.T) {
+	tests := []struct {
+		description string
+		input       string
+		expectedWT  worker.WorkerType
+		expectedOk  bool
+	}{
+		{
+			description: "Valid config string for GetKerberosTicketsWorkerType",
+			input:       "getKerberosTickets",
+			expectedWT:  worker.GetKerberosTicketsWorkerType,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for GetTokenWorkerType",
+			input:       "getToken",
+			expectedWT:  worker.GetTokenWorkerType,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for StoreAndGetTokenWorkerType",
+			input:       "storeAndGetToken",
+			expectedWT:  worker.StoreAndGetTokenWorkerType,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for StoreAndGetTokenInteractiveWorkerType",
+			input:       "storeAndGetTokenInteractive",
+			expectedWT:  worker.StoreAndGetTokenInteractiveWorkerType,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for PingAggregatorWorkerType",
+			input:       "pingAggregator",
+			expectedWT:  worker.PingAggregatorWorkerType,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for PushTokensWorkerType",
+			input:       "pushTokens",
+			expectedWT:  worker.PushTokensWorkerType,
+			expectedOk:  true,
+		},
+		{
+			description: "Invalid config string",
+			input:       "invalidWorkerType",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+		{
+			description: "Empty string",
+			input:       "",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+		{
+			description: "Wrong case",
+			input:       "GetKerberosTickets",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+		{
+			description: "Gibberish string",
+			input:       "asdlkjasdklj",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			wt, ok := workerTypeFromConfig(tc.input)
+			assert.Equal(t, tc.expectedWT, wt)
+			assert.Equal(t, tc.expectedOk, ok)
 		})
 	}
 }
