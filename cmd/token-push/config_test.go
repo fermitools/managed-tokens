@@ -49,7 +49,7 @@ func skipForCI(t *testing.T) {
 // TestGetServiceConfigOverrideKeyOrGlobalKey checks that we properly return the configuration path for a given set of configuration
 // entries.  We want to ensure that if there is a service-level override of a global key, that we properly return that service-level
 // override path
-func TestGetServiceConfigOverrideKeyOrGlobalKey(t *testing.T) {
+func TestGetConfigOverridePath(t *testing.T) {
 	randomKey := func() string { return fmt.Sprintf("key%d", rand.Intn(2^32-1)) }
 	checkOverriddenAndGetKey := func(overridden bool, key string) string {
 		if overridden {
@@ -105,7 +105,7 @@ func TestGetServiceConfigOverrideKeyOrGlobalKey(t *testing.T) {
 				testKey := test.setupTestFunc()
 				expectedConfigPath := test.expectedConfigPathFunc(test.expectedOverridden, testKey)
 
-				configPath, overridden := getServiceConfigOverrideKeyOrGlobalKey(serviceConfigPath, testKey)
+				configPath, overridden := getConfigOverridePath(serviceConfigPath, testKey)
 				viper.Reset()
 				if overridden != test.expectedOverridden {
 					t.Errorf("Got unexpected overridden bool.  Expected %t, got %t", test.expectedOverridden, overridden)
