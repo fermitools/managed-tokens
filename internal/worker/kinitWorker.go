@@ -81,7 +81,7 @@ func (v *kinitSuccess) GetSuccess() bool {
 // GetKerberosTicketsWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // obtains kerberos tickets from the configured kerberos principals.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
-func GetKerberosTicketsWorker(ctx context.Context, chans channelGroup) {
+func getKerberosTicketsWorker(ctx context.Context, chans channelGroup) {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.GetKerberosTicketsWorker")
 	defer span.End()
 
@@ -121,7 +121,7 @@ func GetKerberosTicketsWorker(ctx context.Context, chans channelGroup) {
 			kerbContext, kerbCancel := context.WithTimeout(ctx, kerberosTimeout)
 			defer kerbCancel()
 
-			if err := GetKerberosTicketandVerify(kerbContext, sc); err != nil {
+			if err := getKerberosTicketandVerify(kerbContext, sc); err != nil {
 				var msg string
 				if errors.Is(err, context.DeadlineExceeded) {
 					msg = "Timeout error"
@@ -143,7 +143,7 @@ func GetKerberosTicketsWorker(ctx context.Context, chans channelGroup) {
 	wg.Wait() // Don't close the NotificationsChan or SuccessChan until we're done sending notifications and success statuses
 }
 
-func GetKerberosTicketandVerify(ctx context.Context, sc *Config) error {
+func getKerberosTicketandVerify(ctx context.Context, sc *Config) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.GetKerberosTicketandVerify")
 	span.SetAttributes(
 		attribute.String("experiment", sc.Service.Experiment()),

@@ -159,7 +159,7 @@ func (c *Config) IsNodeUnpingable(node string) bool {
 func initializeWorkerSpecificConfigDefaults() map[WorkerType]map[WorkerSpecificConfigOption]any {
 	m := make(map[WorkerType]map[WorkerSpecificConfigOption]any, 0)
 
-	for i := WorkerType(0); i < invalidWorkerType; i++ {
+	for i := range validWorkerTypes() {
 		m[i] = make(map[WorkerSpecificConfigOption]any, 0)
 		m[i][NumRetriesOption] = retryDefault
 	}

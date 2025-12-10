@@ -115,7 +115,7 @@ func (v *pushTokenSuccess) GetSuccess() bool {
 // PushTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // pushes vault tokens to all the configured destination nodes.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
-func PushTokensWorker(ctx context.Context, chans channelGroup) {
+func pushTokensWorker(ctx context.Context, chans channelGroup) {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.PushTokensWorker")
 	defer span.End()
 
@@ -531,12 +531,12 @@ func getPushTokensValuesFromConfig(c *Config) ([]pushTokensConfig, error) {
 	sendDefaultRoleFile := !dontSendDefaultRoleFile
 
 	// Retry values
-	numRetries, err := getWorkerNumRetriesValueFromConfig(*c, PushTokensWorkerType)
+	numRetries, err := getWorkerNumRetriesValueFromConfig(*c, PushTokens)
 	if err != nil {
 		log.Debug("Could not get retry value from config.  Using default value")
 		numRetries = 0
 	}
-	retrySleepDuration, err := getWorkerRetrySleepValueFromConfig(*c, PushTokensWorkerType)
+	retrySleepDuration, err := getWorkerRetrySleepValueFromConfig(*c, PushTokens)
 	if err != nil {
 		log.Debug("Could not get retry sleep value from config.  Using default value")
 		retrySleepDuration = defaultRetrySleepDuration

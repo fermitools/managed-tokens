@@ -32,7 +32,7 @@ func TestGetTokenWorker(t *testing.T) {
 		sc, _ := NewConfig(s)
 		chans.GetServiceConfigChan() <- sc
 		close(chans.GetServiceConfigChan())
-		go GetTokenWorker(ctx, chans)
+		go getTokenWorker(ctx, chans)
 		select {
 		case n := <-chans.GetNotificationsChan():
 			assert.NotNil(t, n, "Expected notification on NotificationsChan, got nil")
@@ -66,10 +66,10 @@ func TestGetTokenWorker(t *testing.T) {
 			}
 		})
 		f := &fakeTokenGetter{}
-		sc2, _ := NewConfig(s2, SetWorkerSpecificConfigOption(GetTokenWorkerType, AlternateTokenGetterOption, f))
+		sc2, _ := NewConfig(s2, SetWorkerSpecificConfigOption(GetToken, AlternateTokenGetterOption, f))
 		chans2.GetServiceConfigChan() <- sc2
 		close(chans2.GetServiceConfigChan())
-		go GetTokenWorker(ctx, chans2)
+		go getTokenWorker(ctx, chans2)
 		select {
 		case n, ok := <-chans2.GetNotificationsChan():
 			if ok || n != nil {

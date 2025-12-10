@@ -31,16 +31,13 @@ const (
 	// RetrySleepOption is a worker-specific configuration option that represents the time.Duration a worker should sleep between retries
 	RetrySleepOption
 	// InteractiveTokenGetterOption is a worker-specific configuration option that represents whether the token getter should be interactive.
-	// It is supported by the GetTokenWorkerType and StoreAndGetTokenWorkerType worker types
+	// It is supported by the GetToken WorkerType and StoreAndGetToken WorkerType
 	InteractiveTokenGetterOption
-	// AlternateTokenGetterOption is a worker-specific configuration option that represents whether to use an alternate token getter. It is
-	// supported by the GetTokenWorkerType and StoreAndGetTokenWorkerType worker types, and the value of the AlternateTokenGetterOption must
+	// AlternateTokenGetterOption is a worker-specific configuration option that represents whether to use an alternate token getter. It is // supported by the GetToken WorkerType and StoreAndGetToken , and the value of the AlternateTokenGetterOption must
 	// be of a type that implements the TokenGetter interface.
 	AlternateTokenGetterOption
 	invalidWorkerSpecificConfigOption
 )
-
-// TODO:  We should really have setters for this since the types aren't obvious
 
 // Setters
 
@@ -78,7 +75,7 @@ func SetRetrySleepOption(w WorkerType, retrySleep time.Duration) ConfigOption {
 }
 
 func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOption {
-	if w != GetTokenWorkerType && w != StoreAndGetTokenWorkerType {
+	if w != GetToken && w != StoreAndGetToken {
 		return ConfigOption(func(*Config) error { return nil }) // No-op
 	}
 	return SetWorkerSpecificConfigOption(w, InteractiveTokenGetterOption, interactive)
@@ -93,7 +90,7 @@ func SetAlternateTokenGetterOption(w WorkerType, tokenGetter TokenGetter) Config
 // ValidRetryWorkerTypes returns an iterator over the valid WorkerTypes that support retry configuration options
 func ValidRetryWorkerTypes() iter.Seq[WorkerType] {
 	validWorkerTypes := []WorkerType{
-		PushTokensWorkerType,
+		PushTokens,
 	}
 	return func(yield func(w WorkerType) bool) {
 		for _, wt := range validWorkerTypes {
@@ -144,7 +141,6 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 	return valTime, nil
 }
 
-// TODO Need to support this!
 // getInteractiveTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
 // If the worker type is not supported or invalid, an error is returned.
 func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, error) {
@@ -152,7 +148,7 @@ func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, er
 		return false, errors.New("invalid worker type")
 	}
 
-	if w != GetTokenWorkerType && w != StoreAndGetTokenWorkerType {
+	if w != GetToken && w != StoreAndGetToken {
 		return false, fmt.Errorf("workerType %s does not support the InteractiveTokenGetterOption", w)
 	}
 
@@ -176,7 +172,7 @@ func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGette
 		return nil, errors.New("invalid worker type")
 	}
 
-	if w != GetTokenWorkerType && w != StoreAndGetTokenWorkerType {
+	if w != GetToken && w != StoreAndGetToken {
 		return nil, fmt.Errorf("workerType %s does not support the AlternateTokenGetterOption", w)
 	}
 
@@ -187,7 +183,7 @@ func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGette
 
 	valInterface, ok := val[AlternateTokenGetterOption].(TokenGetter)
 	if !ok {
-		return nil, fmt.Errorf("value for workerType %s is not of type tokenGetter.  Got type %T", w, val)
+		return nil, fmt.Errorf("value for workerType %s is not of type TokenGetter.  Got type %T", w, val)
 	}
 
 	return valInterface, nil

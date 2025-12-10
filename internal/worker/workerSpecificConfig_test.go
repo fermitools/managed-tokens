@@ -26,22 +26,22 @@ import (
 func TestGetWorkerRetryValueFromConfig(t *testing.T) {
 	c := &Config{}
 	c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType] = make(map[WorkerSpecificConfigOption]any, 0)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][NumRetriesOption] = uint(5)
+	c.workerSpecificConfig[GetKerberosTickets] = make(map[WorkerSpecificConfigOption]any, 0)
+	c.workerSpecificConfig[GetKerberosTickets][NumRetriesOption] = uint(5)
 
 	// Test case: Worker type exists in the config
-	val, err := getWorkerNumRetriesValueFromConfig(*c, GetKerberosTicketsWorkerType)
+	val, err := getWorkerNumRetriesValueFromConfig(*c, GetKerberosTickets)
 	assert.Nil(t, err)
 	assert.Equal(t, uint(5), val)
 
 	// Test case: Worker type does not exist in the config
-	val, err = getWorkerNumRetriesValueFromConfig(*c, PushTokensWorkerType)
+	val, err = getWorkerNumRetriesValueFromConfig(*c, PushTokens)
 	assert.NotNil(t, err)
 	assert.Equal(t, uint(0), val)
 
 	// Test case: Worker type exists in the config but value is not of type uint
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][NumRetriesOption] = "invalid"
-	val, err = getWorkerNumRetriesValueFromConfig(*c, GetKerberosTicketsWorkerType)
+	c.workerSpecificConfig[GetKerberosTickets][NumRetriesOption] = "invalid"
+	val, err = getWorkerNumRetriesValueFromConfig(*c, GetKerberosTickets)
 	assert.NotNil(t, err)
 	assert.Equal(t, uint(0), val)
 }
@@ -58,22 +58,22 @@ func TestIsValidWorkerSpecificConfigOption(t *testing.T) {
 func TestGetWorkerRetrySleepValueFromConfig(t *testing.T) {
 	c := &Config{}
 	c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType] = make(map[WorkerSpecificConfigOption]any, 0)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][RetrySleepOption] = 5 * time.Second
+	c.workerSpecificConfig[GetKerberosTickets] = make(map[WorkerSpecificConfigOption]any, 0)
+	c.workerSpecificConfig[GetKerberosTickets][RetrySleepOption] = 5 * time.Second
 
 	// Test case: Worker type exists in the config
-	val, err := getWorkerRetrySleepValueFromConfig(*c, GetKerberosTicketsWorkerType)
+	val, err := getWorkerRetrySleepValueFromConfig(*c, GetKerberosTickets)
 	assert.Nil(t, err)
 	assert.Equal(t, 5*time.Second, val)
 
 	// Test case: Worker type does not exist in the config
-	val, err = getWorkerRetrySleepValueFromConfig(*c, PushTokensWorkerType)
+	val, err = getWorkerRetrySleepValueFromConfig(*c, PushTokens)
 	assert.NotNil(t, err)
 	assert.Equal(t, time.Duration(0), val)
 
 	// Test case: Worker type exists in the config but value is not of type time.Duration
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][RetrySleepOption] = "invalid"
-	val, err = getWorkerRetrySleepValueFromConfig(*c, GetKerberosTicketsWorkerType)
+	c.workerSpecificConfig[GetKerberosTickets][RetrySleepOption] = "invalid"
+	val, err = getWorkerRetrySleepValueFromConfig(*c, GetKerberosTickets)
 	assert.NotNil(t, err)
 	assert.Equal(t, time.Duration(0), val)
 }
@@ -91,12 +91,12 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 	testCases := []testCase{
 		{
 			description: "Set NumRetries option",
-			workerType:  GetKerberosTicketsWorkerType,
+			workerType:  GetKerberosTickets,
 			option:      NumRetriesOption,
 			value:       5,
 			expectedConfig: &Config{
 				workerSpecificConfig: map[WorkerType]map[WorkerSpecificConfigOption]any{
-					GetKerberosTicketsWorkerType: {
+					GetKerberosTickets: {
 						NumRetriesOption: 5,
 					},
 				},
@@ -105,12 +105,12 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		},
 		{
 			description: "Set RetrySleep option",
-			workerType:  GetKerberosTicketsWorkerType,
+			workerType:  GetKerberosTickets,
 			option:      RetrySleepOption,
 			value:       5 * time.Second,
 			expectedConfig: &Config{
 				workerSpecificConfig: map[WorkerType]map[WorkerSpecificConfigOption]any{
-					GetKerberosTicketsWorkerType: {
+					GetKerberosTickets: {
 						RetrySleepOption: 5 * time.Second,
 					},
 				},
@@ -119,7 +119,7 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		},
 		{
 			description:    "Invalid worker type",
-			workerType:     invalidWorkerType,
+			workerType:     invalid,
 			option:         NumRetriesOption,
 			value:          5,
 			expectedConfig: nil,
@@ -127,7 +127,7 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		},
 		{
 			description:    "Invalid worker specific config option",
-			workerType:     GetKerberosTicketsWorkerType,
+			workerType:     GetKerberosTickets,
 			option:         invalidWorkerSpecificConfigOption,
 			value:          5,
 			expectedConfig: nil,

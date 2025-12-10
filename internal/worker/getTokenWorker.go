@@ -38,7 +38,7 @@ func (v *getTokenSuccess) GetSuccess() bool {
 	return v.success
 }
 
-func GetTokenWorker(ctx context.Context, chans channelGroup) {
+func getTokenWorker(ctx context.Context, chans channelGroup) {
 	// TODO: Should extract context, take config, use it to get token, throw away the actual token, and return success (some type that implements SuccessReporter)
 	// or error on notifications chan
 
@@ -77,7 +77,7 @@ func GetTokenWorker(ctx context.Context, chans channelGroup) {
 		getTokenTimeoutCtx, getTokenCancel := context.WithTimeout(ctx, getTokenTimeout)
 		defer getTokenCancel()
 
-		interactive, err := getInteractiveTokenGetterOptionFromConfig(*sc, GetTokenWorkerType)
+		interactive, err := getInteractiveTokenGetterOptionFromConfig(*sc, GetToken)
 		if err != nil {
 			scLogger.Error("Could not get interactive token getter option from config. Assuming false")
 			interactive = false
@@ -97,7 +97,7 @@ func GetTokenWorker(ctx context.Context, chans channelGroup) {
 			environ:       &sc.CommandEnvironment,
 		} // Default
 
-		if alternateTokenGetter, err := getAlternateTokenGetterOptionFromConfig(*sc, GetTokenWorkerType); err == nil || alternateTokenGetter != nil {
+		if alternateTokenGetter, err := getAlternateTokenGetterOptionFromConfig(*sc, GetToken); err == nil || alternateTokenGetter != nil {
 			useTokenGetter = alternateTokenGetter
 			scLogger.Debug("Using alternate token getter from service config")
 		}
