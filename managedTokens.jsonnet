@@ -128,6 +128,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
     keytabPath: "/opt/managed-tokens/keytabs",
     condorCollectorHost: "collectorhost.domain",
     condorScheddConstraint: "my_constraint",
+    vaultServer: "my_vault_server",
     serviceCreddVaultTokenPathRoot: "/var/lib/managed-tokens/service-credd-vault-tokens",
     kerberosPrincipalPattern: "principal_pattern",
     dbLocation: "/var/lib/managed-tokens/managed-tokens.db",

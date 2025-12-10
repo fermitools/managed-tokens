@@ -176,6 +176,7 @@
    "tracing": {
       "url": "scheme://hostname.domain"
    },
+   "vaultServer": "my_vault_server",
    "workerType": {
       "getKerberosTickets": {
          "numRetries": 0,
