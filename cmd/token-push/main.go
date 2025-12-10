@@ -407,7 +407,7 @@ func run(ctx context.Context) error {
 			// or if we are not running onboarding
 			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
 
-			if tg := getTokenGetterOverrideFromConfiguration(serviceConfigPath); tg == getTokenWorkerType {
+			if tg := getTokenGetterOverrideFromConfiguration(serviceConfigPath); tg == getToken {
 				wt, err := tokenGetterWorkerTypeToWorkerType(tg)
 				if err != nil {
 					tracing.LogErrorWithTrace(span, funcLogger, "Invalid worker type override in configuration. Skipping service")
@@ -518,7 +518,7 @@ func run(ctx context.Context) error {
 	// Get channels and start worker for getting kerberos ticekts
 	startKerberos := time.Now()
 	span.AddEvent("Starting get kerberos tickets")
-	kerberosChannels := startServiceConfigWorkerForProcessing(ctx, worker.GetKerberosTicketsWorker, serviceConfigs, timeoutKerberos)
+	kerberosChannels := startServiceConfigWorkerForProcessing(ctx, worker.GetKerberosTickets, serviceConfigs, timeoutKerberos)
 
 	// If we couldn't get a kerberos ticket for a service, we don't want to try to get vault
 	// tokens for that service
@@ -553,7 +553,7 @@ func run(ctx context.Context) error {
 		// 2a.  Handle serviceConfigs that only need to get tokens
 		startGetTokens := time.Now()
 		span.AddEvent("Start get tokens for services that only need to get tokens")
-		getTokenChans := startServiceConfigWorkerForProcessing(ctx, worker.GetTokenWorker, _serviceConfigsGetToken, timeoutVaultStorer)
+		getTokenChans := startServiceConfigWorkerForProcessing(ctx, worker.GetToken, _serviceConfigsGetToken, timeoutVaultStorer)
 
 		// Wait until all workers are done, remove any service configs that we couldn't get tokens for from serviceConfigs.
 		failedGetTokenConfigs := removeFailedServiceConfigs(getTokenChans, serviceConfigs)
@@ -570,12 +570,11 @@ func run(ctx context.Context) error {
 		startCondorVault := time.Now()
 		span.AddEvent("Start obtain and store vault tokens")
 
-		var w worker.Worker
-		w = worker.StoreAndGetTokenWorker
+		wt := worker.StoreAndGetToken
 		if viper.GetBool("run-onboarding") {
-			w = worker.StoreAndGetTokenInteractiveWorker
+			wt = worker.StoreAndGetTokenInteractive
 		}
-		condorVaultChans := startServiceConfigWorkerForProcessing(ctx, w, _serviceConfigs, timeoutVaultStorer)
+		condorVaultChans := startServiceConfigWorkerForProcessing(ctx, wt, _serviceConfigs, timeoutVaultStorer)
 
 		// Wait until all workers are done, remove any service configs that we couldn't get tokens for from serviceConfigs
 		failedVaultConfigs := removeFailedServiceConfigs(condorVaultChans, serviceConfigs)
@@ -625,7 +624,7 @@ func run(ctx context.Context) error {
 	// Get channels and start worker for pinging service nodes
 	startPing := time.Now()
 	span.AddEvent("Start ping nodes")
-	pingChans := startServiceConfigWorkerForProcessing(ctx, worker.PingAggregatorWorker, serviceConfigs, timeoutPing)
+	pingChans := startServiceConfigWorkerForProcessing(ctx, worker.PingAggregator, serviceConfigs, timeoutPing)
 
 	for pingSuccess := range pingChans.GetSuccessChan() {
 		if !pingSuccess.GetSuccess() {
@@ -643,7 +642,7 @@ func run(ctx context.Context) error {
 	// Get channels and start worker for pushing tokens to service nodes
 	startPush := time.Now()
 	span.AddEvent("Start push tokens")
-	pushChans := startServiceConfigWorkerForProcessing(ctx, worker.PushTokensWorker, serviceConfigs, timeoutPush)
+	pushChans := startServiceConfigWorkerForProcessing(ctx, worker.PushTokens, serviceConfigs, timeoutPush)
 
 	// Aggregate the successes
 	for pushSuccess := range pushChans.GetSuccessChan() {
