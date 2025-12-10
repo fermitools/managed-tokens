@@ -37,10 +37,10 @@ import (
 // 1. getDefaultVaultTokenLocation is already defined above and gets the vault token location we need -- DONE
 // 2. Add worker type "GetTokenWorker" to just get token.  It will have to instantiate the htgettokenClient, move in the staged vault token,
 //   call GetToken, and then validate the token.
-//  The worker can just throw out the BEARER TOKEN, so we can write the token to a tempfile and delete it after validation
-// 3.  Maybe all the workers could be combined into an interface, with a type switch to determine which worker to use?
-// 4. CondorVaultTokenLocation is defined here and in the worker package.  We only need it here?, and export it perhaps
-// 5. Note - if we get a token with htgettoken, NOT for a schedd, we should save it
+//  The worker can just throw out the BEARER TOKEN, so we can write the token to a tempfile and delete it after validation - DONE
+// 3.  Maybe all the workers could be combined into an interface, with a type switch to determine which worker to use? - DEFERRED
+// 4. CondorVaultTokenLocation is defined here and in the worker package.  We only need it here?, and export it perhaps - DONE
+// 5. Note - if we get a token with htgettoken, NOT for a schedd, we should save it - DONE
 
 // From caller POV:
 // c := NewHtgettokenClient(stuff)
@@ -136,7 +136,8 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 	cmdArgs := h.prepareCmdArgs(issuer, role)
 
 	cmd := environment.EnvironmentWrappedCommand(ctx, h.CommandEnvironment, vaultExecutables["htgettoken"], cmdArgs...)
-	funcLogger.Debug("Running htgettoken command", "command", vaultExecutables["htgettoken"], "args", cmdArgs, "env", cmd.Env)
+	funcLogger.Debug("Running htgettoken command", "command", vaultExecutables["htgettoken"], "args",
+		cmdArgs, "commandEnvironment", h.CommandEnvironment)
 
 	err := runner.executeCommand(ctx, cmd)
 	if err != nil {
