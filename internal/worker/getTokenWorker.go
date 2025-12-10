@@ -83,6 +83,10 @@ func GetTokenWorker(ctx context.Context, chans channelGroup) {
 			interactive = false
 		}
 
+		if interactive {
+			scLogger.Debug("Using interactive token getter as per service config")
+		}
+
 		// Check the kind of TokenGetter to use. If there's no AlternateTokenGetterOption set, use the default token getter
 		var useTokenGetter TokenGetter
 		useTokenGetter = &tokenGetterConfig{
