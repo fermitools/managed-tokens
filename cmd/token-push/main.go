@@ -401,7 +401,19 @@ func run(ctx context.Context) error {
 
 			// If we only have to get a token for this service, add that service to the onlyGetTokenServices map
 			// and override the schedds variable to a nil slice (with a warning)
-			if getTokenGetterOverrideFromConfiguration(serviceConfigPath) == storeAndGetTokenWorkerType {
+
+			// Determine if we need to have our tokenGetter run interactively for the service config.
+			// This will be a no-op if either there is no tokenGetter override in the configuration (default),
+			// or if we are not running onboarding
+			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
+
+			if tg := getTokenGetterOverrideFromConfiguration(serviceConfigPath); tg == getTokenWorkerType {
+				wt, err := tokenGetterWorkerTypeToWorkerType(tg)
+				if err != nil {
+					tracing.LogErrorWithTrace(span, funcLogger, "Invalid worker type override in configuration. Skipping service")
+					return
+				}
+
 				_onlyGetTokenServicesMux.Lock()
 				onlyGetTokenServices[getServiceName(s)] = struct{}{}
 				_onlyGetTokenServicesMux.Unlock()
@@ -411,6 +423,11 @@ func run(ctx context.Context) error {
 					funcLogger.Info("Service configured to only get vault token. Overriding schedds list for this service to nil")
 				}
 				schedds = nil
+
+				if viper.GetBool("run-onboarding") {
+					funcLogger.Debug("Running onboarding; setting token getter to interactive mode")
+					tokenGetterInteractiveSelector = worker.SetInteractiveTokenGetterOption(wt, true)
+				}
 			}
 
 			// Service-level configuration items that can be defined either in configuration file or on system/environment or have library defaults
@@ -441,6 +458,7 @@ func run(ctx context.Context) error {
 				worker.SetSupportedExtrasKeyValue(worker.FileCopierOptions, fileCopierOptions),
 				worker.SetSupportedExtrasKeyValue(worker.PingOptions, extraPingOpts),
 				worker.SetSupportedExtrasKeyValue(worker.SSHOptions, sshOpts),
+				tokenGetterInteractiveSelector,
 			)
 			if err != nil {
 				tracing.LogErrorWithTrace(span, funcLogger, "Could not create config for service")
