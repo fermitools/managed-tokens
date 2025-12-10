@@ -48,6 +48,12 @@ func startServiceConfigWorkerForProcessing(ctx context.Context, workerFunc worke
 	)
 	defer span.End()
 
+	// If we don't have any serviceConfigs to process, don't start the worker
+	if len(serviceConfigs) == 0 || serviceConfigs == nil {
+		exeLogger.Debug("No serviceConfigs to process, not starting worker")
+		return nil
+	}
+
 	channels := worker.NewChannelsForWorkers(len(serviceConfigs))
 
 	startListenerOnWorkerNotificationChans(ctx, channels.GetNotificationsChan())
@@ -76,6 +82,11 @@ func startServiceConfigWorkerForProcessing(ctx context.Context, workerFunc worke
 // were removed
 func removeFailedServiceConfigs(chans chansForWorkers, serviceConfigs map[string]*worker.Config) []*worker.Config {
 	failedConfigs := make([]*worker.Config, 0, len(serviceConfigs))
+	if chans == nil {
+		exeLogger.Debug("No chans provided, nothing to remove from serviceConfigs")
+		return failedConfigs
+	}
+
 	for workerSuccess := range chans.GetSuccessChan() {
 		if !workerSuccess.GetSuccess() {
 			exeLogger.WithField(
