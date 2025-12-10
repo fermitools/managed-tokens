@@ -28,12 +28,12 @@ import (
 )
 
 var validWorkerTypes = []worker.WorkerType{
-	worker.GetKerberosTicketsWorkerType,
-	worker.GetTokenWorkerType,
-	worker.StoreAndGetTokenWorkerType,
-	worker.StoreAndGetTokenInteractiveWorkerType,
-	worker.PingAggregatorWorkerType,
-	worker.PushTokensWorkerType,
+	worker.GetKerberosTickets,
+	worker.GetToken,
+	worker.StoreAndGetToken,
+	worker.StoreAndGetTokenInteractive,
+	worker.PingAggregator,
+	worker.PushTokens,
 }
 
 // workerTypeToConfigString converts a worker type to a string that the configuration uses

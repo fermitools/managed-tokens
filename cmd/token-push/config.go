@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -389,47 +390,47 @@ func getDefaultRoleFileDestinationTemplate(configPath string) string {
 type tokenGetterWorkerType uint8
 
 const (
-	storeAndGetTokenWorkerType tokenGetterWorkerType = iota
-	storeAndGetTokenInteractiveWorkerType
-	getTokenWorkerType
-	invalidTokenGetterWorkerType
+	storeAndGetToken tokenGetterWorkerType = iota
+	storeAndGetTokenInteractive
+	getToken
+	invalidTokenGetter
 )
 
 func isValidTokenGetterWorkerType(t tokenGetterWorkerType) bool {
-	return t < invalidTokenGetterWorkerType
+	return t < invalidTokenGetter
 }
 
 // workerTypeToTokenGetterWorkerType converts a worker.WorkerType to a tokenGetterWorkerType if possible
 func workerTypeToTokenGetterWorkerType(wt worker.WorkerType) tokenGetterWorkerType {
 	switch wt {
-	case worker.StoreAndGetTokenWorkerType:
-		return storeAndGetTokenWorkerType
-	case worker.StoreAndGetTokenInteractiveWorkerType:
-		return storeAndGetTokenInteractiveWorkerType
-	case worker.GetTokenWorkerType:
-		return getTokenWorkerType
+	case worker.StoreAndGetToken:
+		return storeAndGetToken
+	case worker.StoreAndGetTokenInteractive:
+		return storeAndGetTokenInteractive
+	case worker.GetToken:
+		return getToken
 	default:
-		return invalidTokenGetterWorkerType
+		return invalidTokenGetter
 	}
 }
 
 func tokenGetterWorkerTypeToWorkerType(t tokenGetterWorkerType) (worker.WorkerType, error) {
 	switch t {
-	case storeAndGetTokenWorkerType:
-		return worker.StoreAndGetTokenWorkerType, nil
-	case storeAndGetTokenInteractiveWorkerType:
-		return worker.StoreAndGetTokenInteractiveWorkerType, nil
-	case getTokenWorkerType:
-		return worker.GetTokenWorkerType, nil
+	case storeAndGetToken:
+		return worker.StoreAndGetToken, nil
+	case storeAndGetTokenInteractive:
+		return worker.StoreAndGetTokenInteractive, nil
+	case getToken:
+		return worker.GetToken, nil
 	default:
-		return 0, errors.New("invalid tokenGetterWorkerType")
+		return 0, errors.New("invalid tokenGetter")
 	}
 }
 
 // getTokenGetterOverrideFromConfiguration checks the configuration for an overridden tokenGetterWorkerType.
 // If the override key "<configPath>.tokenGetterOverride" exists, the function validates the value, and returns
 // the corresponding tokenGetterWorkerType. If validation fails, or the override key is not set in the configuration,
-// the default of storeAndGetTokenWorkerType is returned.
+// the default of storeAndGetToken is returned.
 func getTokenGetterOverrideFromConfiguration(configPath string) tokenGetterWorkerType {
 	if tokenGetterOverridePath, overridden := getConfigOverridePath(configPath, "tokenGetter"); overridden {
 		// Check the configuration value against the possible valid worker type configuration strings
@@ -437,20 +438,20 @@ func getTokenGetterOverrideFromConfiguration(configPath string) tokenGetterWorke
 		overrideWorkerType, ok := workerTypeFromConfig(overrideValue)
 		if !ok {
 			log.Errorf("Invalid tokenGetter override value %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
-			return storeAndGetTokenWorkerType
+			return storeAndGetToken
 		}
 
 		// Then make sure that's a tokenGetterWorkerType, and return it if it is
 		overrideTokenGetterWorkerType := workerTypeToTokenGetterWorkerType(overrideWorkerType)
 		if !isValidTokenGetterWorkerType(overrideTokenGetterWorkerType) {
 			log.Errorf("Invalid tokenGetter override worker type %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
-			return storeAndGetTokenWorkerType
+			return storeAndGetToken
 		}
 		log.Infof("Using tokenGetter override from configuration: %s", overrideWorkerType.String())
 		return overrideTokenGetterWorkerType // Use validated override value
 	}
 	log.Debug("Using default tokenGetter override from configuration")
-	return storeAndGetTokenWorkerType // Default
+	return storeAndGetToken // Default
 }
 
 // resolveDisableNotifications checks each service's configuration to determine if notifications should be disabled.
@@ -533,11 +534,11 @@ func createWorkerRetryMap(timeoutsMap map[timeoutKey]time.Duration) (map[worker.
 		// The timeout that we should be validating before using it
 		checkTimeout time.Duration
 	}{
-		{worker.GetKerberosTicketsWorkerType, timeoutsMap[timeoutKerberos]},
-		{worker.StoreAndGetTokenWorkerType, timeoutsMap[timeoutVaultStorer]},
-		{worker.StoreAndGetTokenInteractiveWorkerType, timeoutsMap[timeoutVaultStorer]},
-		{worker.PingAggregatorWorkerType, timeoutsMap[timeoutPing]},
-		{worker.PushTokensWorkerType, timeoutsMap[timeoutPush]},
+		{worker.GetKerberosTickets, timeoutsMap[timeoutKerberos]},
+		{worker.StoreAndGetToken, timeoutsMap[timeoutVaultStorer]},
+		{worker.StoreAndGetTokenInteractive, timeoutsMap[timeoutVaultStorer]},
+		{worker.PingAggregator, timeoutsMap[timeoutPing]},
+		{worker.PushTokens, timeoutsMap[timeoutPush]},
 	}
 	for _, retryArg := range _retryArgs {
 		numRetries, retrySleep, err := getAndCheckRetryInfoFromConfig(retryArg.WorkerType, retryArg.checkTimeout)
@@ -562,19 +563,17 @@ func checkRetryTimeout(numRetries int, retrySleepDuration time.Duration, timeout
 
 func setDefaultWorkerRetryMap() map[worker.WorkerType]workerRetryConfig {
 	m := make(map[worker.WorkerType]workerRetryConfig)
+	validRetryWorkerTypes := slices.Collect(worker.ValidRetryWorkerTypes())
 	for _, wt := range validWorkerTypes {
 		// Check to make sure our worker type is one that supports retries
-		for validWt := range worker.ValidRetryWorkerTypes() {
-			if wt != validWt {
-				continue
-			}
-			m[wt] = workerRetryConfig{
-				numRetries: 0,
-				retrySleep: time.Duration(0 * time.Second),
-			}
+		if !slices.Contains(validRetryWorkerTypes, wt) {
+			continue
+		}
+		m[wt] = workerRetryConfig{
+			numRetries: 0,
+			retrySleep: time.Duration(0 * time.Second),
 		}
 	}
-
 	return m
 }
 

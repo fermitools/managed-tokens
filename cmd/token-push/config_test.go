@@ -1244,23 +1244,23 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 				viper.Set("workerType.PushTokens.retrySleep", "1s")
 			},
 			expected: map[worker.WorkerType]workerRetryConfig{
-				worker.GetKerberosTicketsWorkerType: {
+				worker.GetKerberosTickets: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.StoreAndGetTokenInteractiveWorkerType: {
+				worker.StoreAndGetTokenInteractive: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.StoreAndGetTokenWorkerType: {
+				worker.StoreAndGetToken: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.PingAggregatorWorkerType: {
+				worker.PingAggregator: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.PushTokensWorkerType: {
+				worker.PushTokens: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
@@ -1312,7 +1312,7 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 
 func TestSetDefaultWorkerRetryMap(t *testing.T) {
 	m := setDefaultWorkerRetryMap()
-	for _, wt := range validWorkerTypes {
+	for wt := range worker.ValidRetryWorkerTypes() {
 		val, ok := m[wt]
 		if !ok {
 			t.Errorf("Expected worker type %s not found in map", wt)
@@ -1333,7 +1333,7 @@ func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
 	}{
 		{
 			name:          "Valid configuration",
-			workerType:    worker.GetKerberosTicketsWorkerType,
+			workerType:    worker.GetKerberosTickets,
 			checkTimeout:  10 * time.Second,
 			numRetries:    3,
 			retrySleep:    2 * time.Second,
@@ -1341,7 +1341,7 @@ func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
 		},
 		{
 			name:          "Invalid configuration - timeout less than retry duration",
-			workerType:    worker.GetKerberosTicketsWorkerType,
+			workerType:    worker.GetKerberosTickets,
 			checkTimeout:  5 * time.Second,
 			numRetries:    3,
 			retrySleep:    2 * time.Second,
@@ -1385,14 +1385,14 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 		{
 			description:      "No override key set, should return default",
 			overrideValue:    "",
-			expectedType:     storeAndGetTokenWorkerType,
+			expectedType:     storeAndGetToken,
 			expectedOverride: false,
 			setupFunc:        func() {},
 		},
 		{
 			description:      "Valid override: storeAndGetToken",
 			overrideValue:    "storeAndGetToken",
-			expectedType:     storeAndGetTokenWorkerType,
+			expectedType:     storeAndGetToken,
 			expectedOverride: true,
 			setupFunc: func() {
 				viper.Set(configPath+".tokenGetterOverride", "storeAndGetToken")
@@ -1401,7 +1401,7 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 		{
 			description:      "Valid override: storeAndGetTokenInteractive",
 			overrideValue:    "storeAndGetTokenInteractive",
-			expectedType:     storeAndGetTokenInteractiveWorkerType,
+			expectedType:     storeAndGetTokenInteractive,
 			expectedOverride: true,
 			setupFunc: func() {
 				viper.Set(configPath+".tokenGetterOverride", "storeAndGetTokenInteractive")
@@ -1410,7 +1410,7 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 		{
 			description:      "Valid override: getToken",
 			overrideValue:    "getToken",
-			expectedType:     getTokenWorkerType,
+			expectedType:     getToken,
 			expectedOverride: true,
 			setupFunc: func() {
 				viper.Set(configPath+".tokenGetterOverride", "getToken")
@@ -1419,7 +1419,7 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 		{
 			description:      "Invalid override value, should return default",
 			overrideValue:    "InvalidType",
-			expectedType:     storeAndGetTokenWorkerType,
+			expectedType:     storeAndGetToken,
 			expectedOverride: true,
 			setupFunc: func() {
 				viper.Set(configPath+".tokenGetterOverride", "InvalidType")
@@ -1428,7 +1428,7 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 		{
 			description:      "Empty override value, should return default",
 			overrideValue:    "",
-			expectedType:     storeAndGetTokenWorkerType,
+			expectedType:     storeAndGetToken,
 			expectedOverride: true,
 			setupFunc: func() {
 				viper.Set(configPath+".tokenGetterOverride", "")
@@ -1455,24 +1455,24 @@ func TestWorkerTypeToTokenGetterWorkerType(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			description:    "StoreAndGetTokenWorkerType maps to storeAndGetTokenWorkerType",
-			input:          worker.StoreAndGetTokenWorkerType,
-			expectedOutput: storeAndGetTokenWorkerType,
+			description:    "StoreAndGetToken maps to storeAndGetToken",
+			input:          worker.StoreAndGetToken,
+			expectedOutput: storeAndGetToken,
 		},
 		{
-			description:    "StoreAndGetTokenInteractiveWorkerType maps to storeAndGetTokenInteractiveWorkerType",
-			input:          worker.StoreAndGetTokenInteractiveWorkerType,
-			expectedOutput: storeAndGetTokenInteractiveWorkerType,
+			description:    "StoreAndGetTokenInteractive maps to storeAndGetTokenInteractive",
+			input:          worker.StoreAndGetTokenInteractive,
+			expectedOutput: storeAndGetTokenInteractive,
 		},
 		{
-			description:    "GetTokenWorkerType maps to getTokenWorkerType",
-			input:          worker.GetTokenWorkerType,
-			expectedOutput: getTokenWorkerType,
+			description:    "GetToken maps to getToken",
+			input:          worker.GetToken,
+			expectedOutput: getToken,
 		},
 		{
-			description:    "Unknown WorkerType maps to invalidTokenGetterWorkerType",
+			description:    "Unknown WorkerType maps to invalidTokenGetter",
 			input:          worker.WorkerType(99),
-			expectedOutput: invalidTokenGetterWorkerType,
+			expectedOutput: invalidTokenGetter,
 		},
 	}
 
