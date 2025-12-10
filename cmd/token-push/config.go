@@ -413,6 +413,19 @@ func workerTypeToTokenGetterWorkerType(wt worker.WorkerType) tokenGetterWorkerTy
 	}
 }
 
+func tokenGetterWorkerTypeToWorkerType(t tokenGetterWorkerType) (worker.WorkerType, error) {
+	switch t {
+	case storeAndGetTokenWorkerType:
+		return worker.StoreAndGetTokenWorkerType, nil
+	case storeAndGetTokenInteractiveWorkerType:
+		return worker.StoreAndGetTokenInteractiveWorkerType, nil
+	case getTokenWorkerType:
+		return worker.GetTokenWorkerType, nil
+	default:
+		return 0, errors.New("invalid tokenGetterWorkerType")
+	}
+}
+
 // getTokenGetterOverrideFromConfiguration checks the configuration for an overridden tokenGetterWorkerType.
 // If the override key "<configPath>.tokenGetterOverride" exists, the function validates the value, and returns
 // the corresponding tokenGetterWorkerType. If validation fails, or the override key is not set in the configuration,
@@ -421,7 +434,7 @@ func getTokenGetterOverrideFromConfiguration(configPath string) tokenGetterWorke
 	if tokenGetterOverridePath, overridden := getConfigOverridePath(configPath, "tokenGetter"); overridden {
 		// Check the configuration value against the possible valid worker type configuration strings
 		overrideValue := viper.GetString(tokenGetterOverridePath)
-		overrideWorkerType, ok := workerTypeFromConfig(viper.GetString(tokenGetterOverridePath))
+		overrideWorkerType, ok := workerTypeFromConfig(overrideValue)
 		if !ok {
 			log.Errorf("Invalid tokenGetter override value %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
 			return storeAndGetTokenWorkerType
@@ -433,9 +446,10 @@ func getTokenGetterOverrideFromConfiguration(configPath string) tokenGetterWorke
 			log.Errorf("Invalid tokenGetter override worker type %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
 			return storeAndGetTokenWorkerType
 		}
-
+		log.Infof("Using tokenGetter override from configuration: %s", overrideWorkerType.String())
 		return overrideTokenGetterWorkerType // Use validated override value
 	}
+	log.Debug("Using default tokenGetter override from configuration")
 	return storeAndGetTokenWorkerType // Default
 }
 

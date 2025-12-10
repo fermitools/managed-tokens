@@ -72,8 +72,6 @@ type workerRetryConfig struct {
 func setAllWorkerRetryValues(workerRetryMap map[worker.WorkerType]workerRetryConfig) worker.ConfigOption {
 	return func(c *worker.Config) error {
 		for wt, wr := range workerRetryMap {
-			// TODO When we upgrade to Go 1.24, maybe replace the below with an iterator that dynamically generates the
-			// retry-specific worker-specific config options that are supported
 			worker.SetWorkerSpecificConfigOption(wt, worker.NumRetriesOption, wr.numRetries)(c)
 			worker.SetWorkerSpecificConfigOption(wt, worker.RetrySleepOption, wr.retrySleep)(c)
 		}
