@@ -563,9 +563,15 @@ func checkRetryTimeout(numRetries int, retrySleepDuration time.Duration, timeout
 func setDefaultWorkerRetryMap() map[worker.WorkerType]workerRetryConfig {
 	m := make(map[worker.WorkerType]workerRetryConfig)
 	for _, wt := range validWorkerTypes {
-		m[wt] = workerRetryConfig{
-			numRetries: 0,
-			retrySleep: time.Duration(0 * time.Second),
+		// Check to make sure our worker type is one that supports retries
+		for validWt := range worker.ValidRetryWorkerTypes() {
+			if wt != validWt {
+				continue
+			}
+			m[wt] = workerRetryConfig{
+				numRetries: 0,
+				retrySleep: time.Duration(0 * time.Second),
+			}
 		}
 	}
 
