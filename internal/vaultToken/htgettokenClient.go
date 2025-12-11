@@ -136,8 +136,11 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 	cmdArgs := h.prepareCmdArgs(issuer, role)
 
 	cmd := environment.EnvironmentWrappedCommand(ctx, h.CommandEnvironment, vaultExecutables["htgettoken"], cmdArgs...)
-	funcLogger.Debug("Running htgettoken command", "command", vaultExecutables["htgettoken"], "args",
-		cmdArgs, "commandEnvironment", h.CommandEnvironment)
+	funcLogger.WithFields(log.Fields{
+		"command":            vaultExecutables["htgettoken"],
+		"args":               cmdArgs,
+		"commandEnvironment": h.CommandEnvironment,
+	}).Debug("Running htgettoken command")
 
 	err := runner.executeCommand(ctx, cmd)
 	if err != nil {

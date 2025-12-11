@@ -79,7 +79,7 @@ func getTokenWorker(ctx context.Context, chans channelGroup) {
 
 		interactive, err := getInteractiveTokenGetterOptionFromConfig(*sc, GetToken)
 		if err != nil {
-			scLogger.Error("Could not get interactive token getter option from config. Assuming false")
+			scLogger.Errorf("Could not get interactive token getter option from config. Assuming false: %s", err.Error())
 			interactive = false
 		}
 
