@@ -150,3 +150,95 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		})
 	}
 }
+
+func TestGetWorkerTypeMapFromConfig(t *testing.T) {
+	// Good config
+	c := &Config{}
+	c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+	c.workerSpecificConfig[GetKerberosTickets] = make(map[WorkerSpecificConfigOption]any, 0)
+	c.workerSpecificConfig[GetKerberosTickets][NumRetriesOption] = uint(5)
+
+	validWorkerTypeList := []WorkerType{GetKerberosTickets, GetToken}
+
+	// Specific error cases
+	type testCase1 struct {
+		description string
+		config      Config
+		workerType  WorkerType
+		expectedErr error
+	}
+
+	testCases := []testCase1{
+		{
+			description: "Worker type not set in config",
+			config:      *c,
+			workerType:  GetToken,
+			expectedErr: errNoWorkerTypeMapInConfig,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			m, err := getWorkerTypeMapFromConfig(tc.config, tc.workerType, validWorkerTypeList)
+			assert.ErrorIs(t, err, tc.expectedErr)
+			assert.Nil(t, m)
+		})
+	}
+
+	// Test cases with non-specific errors
+
+	w := GetKerberosTickets
+	type testCase2 struct {
+		description         string
+		workerType          WorkerType
+		validWorkerTypes    []WorkerType
+		expected            map[WorkerSpecificConfigOption]any
+		expectedErrNil      bool
+		expectedErrContains string
+	}
+
+	testCases2 := []testCase2{
+		{
+			description:      "Valid case",
+			workerType:       w,
+			validWorkerTypes: validWorkerTypeList,
+			expected:         c.workerSpecificConfig[w],
+			expectedErrNil:   true,
+		},
+		{
+			description:      "Valid case - no restrictions on worker types",
+			workerType:       w,
+			validWorkerTypes: nil,
+			expected:         c.workerSpecificConfig[w],
+			expectedErrNil:   true,
+		},
+		{
+			description:         "Invalid worker type",
+			workerType:          WorkerType(255),
+			validWorkerTypes:    nil,
+			expected:            nil,
+			expectedErrNil:      false,
+			expectedErrContains: "invalid worker type",
+		},
+		{
+			description:         "Worker type not in valid list",
+			workerType:          PushTokens,
+			validWorkerTypes:    validWorkerTypeList,
+			expected:            nil,
+			expectedErrNil:      false,
+			expectedErrContains: "is not in the list of valid worker types",
+		},
+	}
+	for _, tc := range testCases2 {
+		t.Run(tc.description, func(t *testing.T) {
+			m, err := getWorkerTypeMapFromConfig(*c, tc.workerType, tc.validWorkerTypes)
+			if tc.expectedErrNil {
+				assert.Nil(t, err)
+				assert.Equal(t, tc.expected, m)
+				return
+			}
+			assert.Nil(t, m)
+			assert.ErrorContains(t, err, tc.expectedErrContains)
+		})
+	}
+}

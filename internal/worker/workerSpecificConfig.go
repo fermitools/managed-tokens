@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"slices"
 	"time"
 )
 
@@ -101,20 +102,39 @@ func ValidRetryWorkerTypes() iter.Seq[WorkerType] {
 	}
 }
 
+// ValidTokenGetterWorkerTypes returns an iterator over the valid WorkerTypes that support token getter configuration options
+func ValidTokenGetterWorkerTypes() iter.Seq[WorkerType] {
+	validWorkerTypes := []WorkerType{
+		GetToken,
+		StoreAndGetToken,
+	}
+	return func(yield func(w WorkerType) bool) {
+		for _, wt := range validWorkerTypes {
+			if !yield(wt) {
+				return
+			}
+		}
+	}
+}
+
 // Getters
 // getWorkerRetryValueFromConfig retrieves the retry value for a specific worker type from the given configuration.
 // It returns the retry value as a uint and a non-nil error if the worker type is not found in the configuration or if the value is not of type uint.
 func getWorkerNumRetriesValueFromConfig(c Config, w WorkerType) (uint, error) {
-	if !isValidWorkerType(w) {
-		return 0, errors.New("invalid worker type")
+	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidRetryWorkerTypes()))
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return 0, errors.New("no retry configuration found for the given worker type")
+		}
+		return 0, err
 	}
 
-	val, ok := c.workerSpecificConfig[w]
+	val, ok := m[NumRetriesOption]
 	if !ok {
-		return 0, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
+		return 0, fmt.Errorf("no NumRetriesOption found for workerType %s in workerSpecificConfig", w)
 	}
 
-	valUInt, ok := val[NumRetriesOption].(uint)
+	valUInt, ok := val.(uint)
 	if !ok {
 		return 0, fmt.Errorf("value for workerType %s is not of type uint.  Got type %T", w, val)
 	}
@@ -124,16 +144,20 @@ func getWorkerNumRetriesValueFromConfig(c Config, w WorkerType) (uint, error) {
 
 // getWorkerRetrySleepValueFromConfig retrieves the retrySleepValue for a specific worker type from the given configuration.
 func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, error) {
-	if !isValidWorkerType(w) {
-		return 0, errors.New("invalid worker type")
+	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidRetryWorkerTypes()))
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return 0, errors.New("no retry configuration found for the given worker type")
+		}
+		return 0, err
 	}
 
-	val, ok := c.workerSpecificConfig[w]
+	val, ok := m[RetrySleepOption]
 	if !ok {
-		return 0, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
+		return 0, fmt.Errorf("no RetrySleepOption found for workerType %s in workerSpecificConfig", w)
 	}
 
-	valTime, ok := val[RetrySleepOption].(time.Duration)
+	valTime, ok := val.(time.Duration)
 	if !ok {
 		return 0, fmt.Errorf("value for workerType %s is not of type time.Duration.  Got type %T", w, val)
 	}
@@ -144,20 +168,22 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 // getInteractiveTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
 // If the worker type is not supported or invalid, an error is returned.
 func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, error) {
-	if !isValidWorkerType(w) {
-		return false, errors.New("invalid worker type")
+	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return false, errors.New("no token getter configuration found for the given worker type")
+		}
+		return false, err
 	}
 
-	if w != GetToken && w != StoreAndGetToken {
-		return false, fmt.Errorf("workerType %s does not support the InteractiveTokenGetterOption", w)
-	}
-
-	val, ok := c.workerSpecificConfig[w]
+	// Does that map have the InteractiveTokenGetterOption key set?
+	val, ok := m[InteractiveTokenGetterOption]
 	if !ok {
-		return false, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
+		return false, nil // This is not an error case - just that the option is not set
 	}
 
-	valBool, ok := val[InteractiveTokenGetterOption].(bool)
+	// Type-check the value
+	valBool, ok := val.(bool)
 	if !ok {
 		return false, fmt.Errorf("value for workerType %s is not of type bool.  Got type %T", w, val)
 	}
@@ -165,23 +191,23 @@ func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, er
 	return valBool, nil
 }
 
-// getInteractiveTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
+// getAlternateTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
 // If the worker type is not supported or invalid, an error is returned.
 func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGetter, error) {
-	if !isValidWorkerType(w) {
-		return nil, errors.New("invalid worker type")
+	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return nil, errors.New("no token getter configuration found for the given worker type")
+		}
+		return nil, err
 	}
 
-	if w != GetToken && w != StoreAndGetToken {
-		return nil, fmt.Errorf("workerType %s does not support the AlternateTokenGetterOption", w)
-	}
-
-	val, ok := c.workerSpecificConfig[w]
+	val, ok := m[AlternateTokenGetterOption]
 	if !ok {
-		return nil, fmt.Errorf("workerType %s not found in workerSpecificConfig", w)
+		return nil, fmt.Errorf("no AlternateTokenGetterOption found for workerType %s in workerSpecificConfig", w)
 	}
 
-	valInterface, ok := val[AlternateTokenGetterOption].(TokenGetter)
+	valInterface, ok := val.(TokenGetter)
 	if !ok {
 		return nil, fmt.Errorf("value for workerType %s is not of type TokenGetter.  Got type %T", w, val)
 	}
@@ -192,3 +218,25 @@ func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGette
 func isValidWorkerSpecificConfigOption(option WorkerSpecificConfigOption) bool {
 	return option < invalidWorkerSpecificConfigOption
 }
+
+// getWorkerTypeMapFromConfig retrieves the worker-specific configuration map for a given worker type from the provided Config.
+// It first checks if the worker type is valid and, if the slice validWorkerTypes is not nil, ensures the worker type is included in that list.
+// Returns the configuration map associated with the worker type, or an error if the worker type is invalid, not in the valid list, or not present in the configuration.
+func getWorkerTypeMapFromConfig(c Config, w WorkerType, validWorkerTypes []WorkerType) (map[WorkerSpecificConfigOption]any, error) {
+	if !isValidWorkerType(w) {
+		return nil, errors.New("invalid worker type")
+	}
+
+	if validWorkerTypes != nil && !slices.Contains(validWorkerTypes, w) {
+		return nil, fmt.Errorf("workerType %s is not in the list of valid worker types %v", w, validWorkerTypes)
+	}
+
+	m, ok := c.workerSpecificConfig[w]
+	if !ok {
+		return nil, errNoWorkerTypeMapInConfig
+	}
+
+	return m, nil
+}
+
+var errNoWorkerTypeMapInConfig error = errors.New("given worker type not found in worker Config")
