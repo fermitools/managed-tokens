@@ -530,14 +530,25 @@ func getPushTokensValuesFromConfig(c *Config) ([]pushTokensConfig, error) {
 	}
 	sendDefaultRoleFile := !dontSendDefaultRoleFile
 
+	var numRetries uint
+	var retrySleepDuration time.Duration
 	// Retry values
-	numRetries, err := getWorkerNumRetriesValueFromConfig(*c, PushTokens)
-	if err != nil {
+	numRetries, err = getWorkerNumRetriesValueFromConfig(*c, PushTokens)
+	switch {
+	case errors.Is(err, errNoWorkerTypeMapInConfig):
+		log.Debug("No retry configuration found for PushTokens worker type.  Using default values")
+		numRetries = 0
+	case err != nil:
 		log.Debug("Could not get retry value from config.  Using default value")
 		numRetries = 0
 	}
-	retrySleepDuration, err := getWorkerRetrySleepValueFromConfig(*c, PushTokens)
-	if err != nil {
+
+	retrySleepDuration, err = getWorkerRetrySleepValueFromConfig(*c, PushTokens)
+	switch {
+	case errors.Is(err, errNoWorkerTypeMapInConfig):
+		log.Debug("No retry configuration found for PushTokens worker type.  Using default values")
+		retrySleepDuration = defaultRetrySleepDuration
+	case err != nil:
 		log.Debug("Could not get retry sleep value from config.  Using default value")
 		retrySleepDuration = defaultRetrySleepDuration
 	}
