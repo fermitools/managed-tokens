@@ -402,18 +402,12 @@ func run(ctx context.Context) error {
 			// If we only have to get a token for this service, add that service to the onlyGetTokenServices map
 			// and override the schedds variable to a nil slice (with a warning)
 
-			// Determine if we need to have our tokenGetter run interactively for the service config.
+			// Determine if we need to have our token-obtaining worker run interactively for the service config.
 			// This will be a no-op if either there is no tokenGetter override in the configuration (default),
 			// or if we are not running onboarding
 			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
 
-			if tg := getTokenGetterOverrideFromConfiguration(serviceConfigPath); tg == getToken {
-				wt, err := tokenGetterWorkerTypeToWorkerType(tg)
-				if err != nil {
-					tracing.LogErrorWithTrace(span, funcLogger, "Invalid worker type override in configuration. Skipping service")
-					return
-				}
-
+			if wt := getTokenGetterOverrideFromConfiguration(serviceConfigPath); wt == worker.GetToken {
 				_onlyGetTokenServicesMux.Lock()
 				onlyGetTokenServices[getServiceName(s)] = struct{}{}
 				_onlyGetTokenServicesMux.Unlock()

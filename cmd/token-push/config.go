@@ -383,75 +383,34 @@ func getDefaultRoleFileDestinationTemplate(configPath string) string {
 	return viper.GetString(defaultRoleFileDestinationTmplPath)
 }
 
-// tokenGetterWorkerType is an enum representing the type of token getter worker to use. It is mainly used where
-// restriction is needed of a worker type
-//
-// Note: This restriction could have been done with an interface, but that was deemed to be too complicated.
-type tokenGetterWorkerType uint8
-
-const (
-	storeAndGetToken tokenGetterWorkerType = iota
-	storeAndGetTokenInteractive
-	getToken
-	invalidTokenGetter
-)
-
-func isValidTokenGetterWorkerType(t tokenGetterWorkerType) bool {
-	return t < invalidTokenGetter
-}
-
-// workerTypeToTokenGetterWorkerType converts a worker.WorkerType to a tokenGetterWorkerType if possible
-func workerTypeToTokenGetterWorkerType(wt worker.WorkerType) tokenGetterWorkerType {
-	switch wt {
-	case worker.StoreAndGetToken:
-		return storeAndGetToken
-	case worker.StoreAndGetTokenInteractive:
-		return storeAndGetTokenInteractive
-	case worker.GetToken:
-		return getToken
-	default:
-		return invalidTokenGetter
-	}
-}
-
-func tokenGetterWorkerTypeToWorkerType(t tokenGetterWorkerType) (worker.WorkerType, error) {
-	switch t {
-	case storeAndGetToken:
-		return worker.StoreAndGetToken, nil
-	case storeAndGetTokenInteractive:
-		return worker.StoreAndGetTokenInteractive, nil
-	case getToken:
-		return worker.GetToken, nil
-	default:
-		return 0, errors.New("invalid tokenGetter")
-	}
-}
-
-// getTokenGetterOverrideFromConfiguration checks the configuration for an overridden tokenGetterWorkerType.
+// getTokenGetterOverrideFromConfiguration checks the configuration for an overridden tokenGetter worker.WorkerType.
 // If the override key "<configPath>.tokenGetterOverride" exists, the function validates the value, and returns
-// the corresponding tokenGetterWorkerType. If validation fails, or the override key is not set in the configuration,
-// the default of storeAndGetToken is returned.
-func getTokenGetterOverrideFromConfiguration(configPath string) tokenGetterWorkerType {
+// the corresponding WorkerType. If validation fails, or the override key is not set in the configuration,
+// the default of worker.StoreAndGetToken is returned.
+func getTokenGetterOverrideFromConfiguration(configPath string) worker.WorkerType {
+	_default := worker.StoreAndGetToken // If validation fails or if we did not override the TokenGetter in the configuration, use worker.StoreAndGetToken
+
 	if tokenGetterOverridePath, overridden := getConfigOverridePath(configPath, "tokenGetter"); overridden {
 		// Check the configuration value against the possible valid worker type configuration strings
 		overrideValue := viper.GetString(tokenGetterOverridePath)
 		overrideWorkerType, ok := workerTypeFromConfig(overrideValue)
 		if !ok {
 			log.Errorf("Invalid tokenGetter override value %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
-			return storeAndGetToken
+			return _default
 		}
 
-		// Then make sure that's a tokenGetterWorkerType, and return it if it is
-		overrideTokenGetterWorkerType := workerTypeToTokenGetterWorkerType(overrideWorkerType)
-		if !isValidTokenGetterWorkerType(overrideTokenGetterWorkerType) {
+		// Make sure we have a valid TokenGetter worker type
+		if !slices.Contains(slices.Collect(worker.ValidTokenGetterWorkerTypes()), overrideWorkerType) {
 			log.Errorf("Invalid tokenGetter override worker type %s found in configuration at %s. Using default", overrideValue, tokenGetterOverridePath)
-			return storeAndGetToken
+			return _default
 		}
+
 		log.Infof("Using tokenGetter override from configuration: %s", overrideWorkerType.String())
-		return overrideTokenGetterWorkerType // Use validated override value
+		return overrideWorkerType // Use validated override value
 	}
+
 	log.Debug("Using default tokenGetter override from configuration")
-	return storeAndGetToken // Default
+	return _default
 }
 
 // resolveDisableNotifications checks each service's configuration to determine if notifications should be disabled.
