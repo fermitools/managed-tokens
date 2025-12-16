@@ -107,6 +107,7 @@ func ValidTokenGetterWorkerTypes() iter.Seq[WorkerType] {
 	validWorkerTypes := []WorkerType{
 		GetToken,
 		StoreAndGetToken,
+		StoreAndGetTokenInteractive,
 	}
 	return func(yield func(w WorkerType) bool) {
 		for _, wt := range validWorkerTypes {
