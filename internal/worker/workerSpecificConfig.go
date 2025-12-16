@@ -125,7 +125,7 @@ func getWorkerNumRetriesValueFromConfig(c Config, w WorkerType) (uint, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidRetryWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return 0, errors.New("no retry configuration found for the given worker type")
+			return 0, fmt.Errorf("no WorkerType %s map found in Config: %w", w, err)
 		}
 		return 0, err
 	}
@@ -148,7 +148,7 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidRetryWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return 0, errors.New("no retry configuration found for the given worker type")
+			return 0, fmt.Errorf("no WorkerType %s map found in Config: %w", w, err)
 		}
 		return 0, err
 	}
