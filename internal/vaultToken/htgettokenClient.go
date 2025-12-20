@@ -118,6 +118,8 @@ func (h *HtgettokenClient) GetToken(ctx context.Context, issuer, role string, in
 	)
 	defer span.End()
 	funcLogger := log.WithField("caller", "HtgettokenClient.GetToken")
+
+	// Check the context before proceeding
 	if err := ctx.Err(); err != nil {
 		msg := "context deadline exceeded before getting token"
 		if errors.Is(err, context.Canceled) {
@@ -235,6 +237,7 @@ func checkToken(tokenFile, issuer, role string) error {
 	return nil
 }
 
+// TODO move this somewhere else?
 // commandExecutor defines an interface for executing commands.
 type commandExecutor interface {
 	executeCommand(ctx context.Context, c *exec.Cmd) error
