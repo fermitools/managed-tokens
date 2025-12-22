@@ -73,6 +73,9 @@ func (v *VaultStorerClient) WithVerbose() *VaultStorerClient {
 	return v
 }
 
+func (v *VaultStorerClient) GetCredd() string       { return v.credd }
+func (v *VaultStorerClient) GetVaultServer() string { return v.vaultServer }
+
 // GetAndStoreToken gets and stores a vault token for the given serviceName in the configured vault server and credd.
 // If interactive is true, the command may prompt the user for action if needed.
 func (v *VaultStorerClient) GetAndStoreToken(ctx context.Context, serviceName string, interactive bool) error {
