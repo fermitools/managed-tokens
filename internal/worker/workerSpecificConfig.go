@@ -76,7 +76,7 @@ func SetRetrySleepOption(w WorkerType, retrySleep time.Duration) ConfigOption {
 }
 
 func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOption {
-	if w != GetToken && w != StoreAndGetToken {
+	if !slices.Contains(slices.Collect(ValidTokenGetterWorkerTypes()), w) {
 		return ConfigOption(func(*Config) error { return nil }) // No-op
 	}
 	return SetWorkerSpecificConfigOption(w, InteractiveTokenGetterOption, interactive)
@@ -107,7 +107,6 @@ func ValidTokenGetterWorkerTypes() iter.Seq[WorkerType] {
 	validWorkerTypes := []WorkerType{
 		GetToken,
 		StoreAndGetToken,
-		StoreAndGetTokenInteractive,
 	}
 	return func(yield func(w WorkerType) bool) {
 		for _, wt := range validWorkerTypes {

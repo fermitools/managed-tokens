@@ -25,7 +25,6 @@ const (
 	GetKerberosTickets WorkerType = iota
 	GetToken
 	StoreAndGetToken
-	StoreAndGetTokenInteractive
 	PingAggregator
 	PushTokens
 	invalid
@@ -50,8 +49,6 @@ func (wt WorkerType) String() string {
 		return "GetToken"
 	case StoreAndGetToken:
 		return "StoreAndGetToken"
-	case StoreAndGetTokenInteractive:
-		return "StoreAndGetTokenInteractive"
 	case PingAggregator:
 		return "PingAggregator"
 	case PushTokens:
@@ -61,9 +58,7 @@ func (wt WorkerType) String() string {
 	}
 }
 
-// TODO:  Idea: tie WorkerType to Worker, and maybe even unexport worker.  That way, we have to pick
-// the worker type, adn it launches the right worker
-
+// Worker returns the Worker function associated with the WorkerType.
 func (w WorkerType) Worker() Worker {
 	switch w {
 	case GetKerberosTickets:
@@ -72,8 +67,6 @@ func (w WorkerType) Worker() Worker {
 		return getTokenWorker
 	case StoreAndGetToken:
 		return storeAndGetTokenWorker
-	case StoreAndGetTokenInteractive:
-		return storeAndGetTokenInteractiveWorker
 	case PingAggregator:
 		return pingAggregatorWorker
 	case PushTokens:
