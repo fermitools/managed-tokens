@@ -117,7 +117,8 @@ func (v *VaultStorerClient) GetAndStoreToken(ctx context.Context, serviceName st
 	return nil
 }
 
-// TODO.  See if we can set this up like the htgettokenclient code.  Where we have a single entry point here, with an interactive bool that the caller can
+// TODO.  Remove this after testing.
+// See if we can set this up like the htgettokenclient code.  Where we have a single entry point here, with an interactive bool that the caller can
 // set to indicate whether the token storing action should be interactive or not.  Then we can get rid of a lot of this boilerplate and the caller just has to know
 // to call a single function.
 

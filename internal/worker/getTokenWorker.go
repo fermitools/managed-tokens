@@ -39,9 +39,6 @@ func (v *getTokenSuccess) GetSuccess() bool {
 }
 
 func getTokenWorker(ctx context.Context, chans channelGroup) {
-	// TODO: Should extract context, take config, use it to get token, throw away the actual token, and return success (some type that implements SuccessReporter)
-	// or error on notifications chan
-
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.GetTokenWorker")
 	defer span.End()
 
@@ -118,7 +115,7 @@ func getTokenWorker(ctx context.Context, chans channelGroup) {
 				unwrappedErr := errors.Unwrap(err)
 				errToReport = fmt.Errorf("%s: %s", msg, err.Error())
 				if unwrappedErr != nil {
-					// Check to see if authorization is needed.  This is an error condition for non-interactive token storing
+					// Check to see if authentication is needed.  This is an error condition for non-interactive token storing
 					var authNeededErrorPtr *vaultToken.ErrAuthNeeded
 					if errors.As(unwrappedErr, &authNeededErrorPtr) && !interactive {
 						errToReport = fmt.Errorf("%s: %s", msg, unwrappedErr.Error())

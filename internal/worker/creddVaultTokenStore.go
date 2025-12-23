@@ -42,13 +42,24 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 	restorePriorTokenFunc = func() error { return nil }
 
 	// Check for token at condorVaultTokenLocation, and move it out if needed
+	// 1. If file doesn't exist, do nothing, return
+	// 2. If file exists, but can't stat it, return error, do nothing so we overwrite with good file
+	// 3. If file exists, and there is no error stat-ing it, stash it
+
 	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
-	// TODO Strengthen this file check.  One more func that checks if a file exists or not, maybe goes into utils
-	if _, err := os.Stat(condorVaultTokenLocation); !errors.Is(err, os.ErrNotExist) {
-		if err != nil {
-			funcLogger.Errorf("Could not stat condor vault token file that exists: %s", err)
-			return restorePriorTokenFunc, err
-		}
+
+	_, err := os.Stat(condorVaultTokenLocation)
+	switch {
+	// (1)
+	case errors.Is(err, os.ErrNotExist):
+		funcLogger.Debugf("No existing condor vault token at %s.  No backup needed.", condorVaultTokenLocation)
+		return restorePriorTokenFunc, nil
+	// (2)
+	case err != nil:
+		funcLogger.Errorf("Could not stat condor vault token file that exists at %s: %s", condorVaultTokenLocation, err)
+		return restorePriorTokenFunc, err
+	// (3)
+	default:
 		// We had a vault token at condorVaultTokenLocation.  Move it to a temp file for now
 		previousTokenTempFile, err := os.CreateTemp(os.TempDir(), "managed_tokens_condor_vault_token")
 		if err != nil {
@@ -68,6 +79,7 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 			funcLogger.Error("Could not move currently-existing condor vault token to staging location")
 			return restorePriorTokenFunc, err
 		}
+		// Create a func to return that will restore the now-stashed token back to condorVaultTokenLocation
 		restorePriorTokenFunc = func() error {
 			// TODO:  This part is not tested.  Think about how to do that
 			if err := moveFileCrossDevice(previousTokenTempFile.Name(), condorVaultTokenLocation); err != nil {
@@ -89,7 +101,6 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 		}
 		return restorePriorTokenFunc, nil
 	}
-	return
 }
 
 // stageStoredTokenFile checks to see if there already exists a vault token for the given service and

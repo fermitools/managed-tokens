@@ -323,7 +323,6 @@ func TestVaultStorerClientSetupCmdEnvironment(t *testing.T) {
 func TestNewVaultStorerClient(t *testing.T) {
 	initialCredd := "credd1"
 	vaultServer := "vaultServer.host"
-	// TODO: Good test cases, but want to check entire VaultStorerClient struct
 	type testCase struct {
 		description               string
 		initialCreddHost          string
