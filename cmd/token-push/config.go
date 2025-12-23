@@ -409,7 +409,6 @@ func getTokenGetterOverrideFromConfiguration(configPath string) worker.WorkerTyp
 		return overrideWorkerType // Use validated override value
 	}
 
-	log.Debug("Using default tokenGetter override from configuration")
 	return _default
 }
 
