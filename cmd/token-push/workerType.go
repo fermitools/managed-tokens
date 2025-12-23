@@ -31,7 +31,6 @@ var validWorkerTypes = []worker.WorkerType{
 	worker.GetKerberosTickets,
 	worker.GetToken,
 	worker.StoreAndGetToken,
-	worker.StoreAndGetTokenInteractive,
 	worker.PingAggregator,
 	worker.PushTokens,
 }

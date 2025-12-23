@@ -494,8 +494,8 @@ func createWorkerRetryMap(timeoutsMap map[timeoutKey]time.Duration) (map[worker.
 		checkTimeout time.Duration
 	}{
 		{worker.GetKerberosTickets, timeoutsMap[timeoutKerberos]},
+		{worker.GetToken, timeoutsMap[timeoutVaultStorer]},
 		{worker.StoreAndGetToken, timeoutsMap[timeoutVaultStorer]},
-		{worker.StoreAndGetTokenInteractive, timeoutsMap[timeoutVaultStorer]},
 		{worker.PingAggregator, timeoutsMap[timeoutPing]},
 		{worker.PushTokens, timeoutsMap[timeoutPush]},
 	}

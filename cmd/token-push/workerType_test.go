@@ -237,10 +237,6 @@ func TestWorkerTypeToConfigString(t *testing.T) {
 			expected:   "storeAndGetToken",
 		},
 		{
-			workerType: worker.StoreAndGetTokenInteractive,
-			expected:   "storeAndGetTokenInteractive",
-		},
-		{
 			workerType: worker.PingAggregator,
 			expected:   "pingAggregator",
 		},
@@ -281,12 +277,6 @@ func TestWorkerTypeFromConfig(t *testing.T) {
 			description: "Valid config string for StoreAndGetToken",
 			input:       "storeAndGetToken",
 			expectedWT:  worker.StoreAndGetToken,
-			expectedOk:  true,
-		},
-		{
-			description: "Valid config string for StoreAndGetTokenInteractive",
-			input:       "storeAndGetTokenInteractive",
-			expectedWT:  worker.StoreAndGetTokenInteractive,
 			expectedOk:  true,
 		},
 		{

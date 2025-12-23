@@ -1234,8 +1234,8 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 			testConfigSetup: func() {
 				viper.Set("workerType.GetKerberosTickets.numRetries", 1)
 				viper.Set("workerType.GetKerberosTickets.retrySleep", "1s")
-				viper.Set("workerType.StoreAndGetTokenInteractive.numRetries", 1)
-				viper.Set("workerType.StoreAndGetTokenInteractive.retrySleep", "1s")
+				viper.Set("workerType.GetToken.numRetries", 1)
+				viper.Set("workerType.GetToken.retrySleep", "1s")
 				viper.Set("workerType.StoreAndGetToken.numRetries", 1)
 				viper.Set("workerType.StoreAndGetToken.retrySleep", "1s")
 				viper.Set("workerType.PingAggregator.numRetries", 1)
@@ -1248,7 +1248,7 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.StoreAndGetTokenInteractive: {
+				worker.GetToken: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
@@ -1396,15 +1396,6 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 			expectedOverride: true,
 			setupFunc: func() {
 				viper.Set(configPath+".tokenGetterOverride", "storeAndGetToken")
-			},
-		},
-		{
-			description:      "Valid override: storeAndGetTokenInteractive",
-			overrideValue:    "storeAndGetTokenInteractive",
-			expectedType:     worker.StoreAndGetTokenInteractive,
-			expectedOverride: true,
-			setupFunc: func() {
-				viper.Set(configPath+".tokenGetterOverride", "storeAndGetTokenInteractive")
 			},
 		},
 		{

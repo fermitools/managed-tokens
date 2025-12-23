@@ -399,6 +399,7 @@ func run(ctx context.Context) error {
 				return
 			}
 
+			// TODO: Have the below happen FIRST
 			// If we only have to get a token for this service, add that service to the onlyGetTokenServices map
 			// and override the schedds variable to a nil slice (with a warning)
 
@@ -407,7 +408,8 @@ func run(ctx context.Context) error {
 			// or if we are not running onboarding
 			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
 
-			if wt := getTokenGetterOverrideFromConfiguration(serviceConfigPath); wt == worker.GetToken {
+			switch wt := getTokenGetterOverrideFromConfiguration(serviceConfigPath); wt {
+			case worker.GetToken:
 				_onlyGetTokenServicesMux.Lock()
 				onlyGetTokenServices[getServiceName(s)] = struct{}{}
 				_onlyGetTokenServicesMux.Unlock()
@@ -417,8 +419,11 @@ func run(ctx context.Context) error {
 					funcLogger.Info("Service configured to only get vault token. Overriding schedds list for this service to nil")
 				}
 				schedds = nil
-
+				fallthrough // ALWAYS run the check in the default case
+			default:
 				if viper.GetBool("run-onboarding") {
+					// For any worker type in worker.ValidTokenGetterWorkerTypes,
+					// if we're running onboarding, then set the interactive bool in the worker.Config
 					funcLogger.Debug("Running onboarding; setting token getter to interactive mode")
 					tokenGetterInteractiveSelector = worker.SetInteractiveTokenGetterOption(wt, true)
 				}
@@ -533,15 +538,15 @@ func run(ctx context.Context) error {
 	// We're enclosing this in a func() so that the garbage collector can try to clean up the extra maps we'll have to make here
 	func() {
 		_serviceConfigsGetToken := make(map[string]*worker.Config)
-		_serviceConfigs := make(map[string]*worker.Config)
+		_serviceConfigsStoreAndGetToken := make(map[string]*worker.Config)
 
-		// Pick which serviceConfigs are going to use a worker.GetTokenWorker vs worker.StoreAndGetTokenWorker (either interactive or not)
+		// Pick which serviceConfigs are going to use a worker.GetTokenWorker vs worker.StoreAndGetTokenWorker
 		for serviceName := range serviceConfigs {
 			if _, ok := onlyGetTokenServices[serviceName]; ok {
 				_serviceConfigsGetToken[serviceName] = serviceConfigs[serviceName]
 				continue
 			}
-			_serviceConfigs[serviceName] = serviceConfigs[serviceName]
+			_serviceConfigsStoreAndGetToken[serviceName] = serviceConfigs[serviceName]
 		}
 
 		// 2a.  Handle serviceConfigs that only need to get tokens
@@ -564,11 +569,8 @@ func run(ctx context.Context) error {
 		startCondorVault := time.Now()
 		span.AddEvent("Start obtain and store vault tokens")
 
-		wt := worker.StoreAndGetToken
-		if viper.GetBool("run-onboarding") {
-			wt = worker.StoreAndGetTokenInteractive
-		}
-		condorVaultChans := startServiceConfigWorkerForProcessing(ctx, wt, _serviceConfigs, timeoutVaultStorer)
+		// Get channels and start worker for getting and storing vault tokens
+		condorVaultChans := startServiceConfigWorkerForProcessing(ctx, worker.StoreAndGetToken, _serviceConfigsStoreAndGetToken, timeoutVaultStorer)
 
 		// Wait until all workers are done, remove any service configs that we couldn't get tokens for from serviceConfigs
 		failedVaultConfigs := removeFailedServiceConfigs(condorVaultChans, serviceConfigs)
