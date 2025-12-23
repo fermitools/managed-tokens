@@ -393,40 +393,35 @@ func run(ctx context.Context) error {
 				return
 			}
 
-			collectorHost, schedds, err := getScheddsAndCollectorHostFromConfiguration(ctx, serviceConfigPath)
-			if err != nil {
-				tracing.LogErrorWithTrace(span, funcLogger, "Cannot proceed without schedds. Returning now")
-				return
-			}
-
-			// TODO: Have the below happen FIRST
 			// If we only have to get a token for this service, add that service to the onlyGetTokenServices map
-			// and override the schedds variable to a nil slice (with a warning)
-
-			// Determine if we need to have our token-obtaining worker run interactively for the service config.
-			// This will be a no-op if either there is no tokenGetter override in the configuration (default),
-			// or if we are not running onboarding
-			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
-
-			switch wt := getTokenGetterOverrideFromConfiguration(serviceConfigPath); wt {
+			// and set the schedds variable to a nil slice (with a warning).
+			var collectorHost string
+			var schedds []string
+			tokenGetterWT := getTokenGetterOverrideFromConfiguration(serviceConfigPath)
+			switch tokenGetterWT {
 			case worker.GetToken:
 				_onlyGetTokenServicesMux.Lock()
 				onlyGetTokenServices[getServiceName(s)] = struct{}{}
 				_onlyGetTokenServicesMux.Unlock()
 
-				nonNilOldSchedds := (schedds != nil)
-				if nonNilOldSchedds {
-					funcLogger.Info("Service configured to only get vault token. Overriding schedds list for this service to nil")
-				}
+				funcLogger.Info("Service configured to only get vault token. schedds list for this service will be nil")
 				schedds = nil
-				fallthrough // ALWAYS run the check in the default case
-			default:
-				if viper.GetBool("run-onboarding") {
-					// For any worker type in worker.ValidTokenGetterWorkerTypes,
-					// if we're running onboarding, then set the interactive bool in the worker.Config
-					funcLogger.Debug("Running onboarding; setting token getter to interactive mode")
-					tokenGetterInteractiveSelector = worker.SetInteractiveTokenGetterOption(wt, true)
+			case worker.StoreAndGetToken:
+				collectorHost, schedds, err = getScheddsAndCollectorHostFromConfiguration(ctx, serviceConfigPath)
+				if err != nil {
+					tracing.LogErrorWithTrace(span, funcLogger, "Cannot proceed without schedds. Returning now")
+					return
 				}
+			}
+
+			// Determine if we need to have our token-obtaining worker run interactively for the service config.
+			// This will be a no-op if either there is no tokenGetter override in the configuration (default),
+			// or if we are not running onboarding.  For any worker type in worker.ValidTokenGetterWorkerTypes,
+			// if we're running onboarding, then set the interactive bool in the worker.Config
+			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
+			if viper.GetBool("run-onboarding") {
+				funcLogger.Debug("Running onboarding; setting token getter to interactive mode")
+				tokenGetterInteractiveSelector = worker.SetInteractiveTokenGetterOption(tokenGetterWT, true)
 			}
 
 			// Service-level configuration items that can be defined either in configuration file or on system/environment or have library defaults
