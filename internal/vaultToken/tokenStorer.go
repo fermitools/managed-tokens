@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 
 	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
@@ -354,39 +353,6 @@ func (v *VaultStorerClient) setupCmdEnvironment() *environment.CommandEnvironmen
 	newEnv.SetCondorSecCredentialGettokenOpts(oldCondorSecCredentialGettokenOpts + maybeSpace + fmt.Sprintf("-a %s", v.vaultServer))
 	return newEnv
 }
-
-func checkStdoutStderrForAuthNeededError(stdoutStderr []byte) error {
-	authNeededRegexp := regexp.MustCompile(`Authentication needed for.*`)
-	if !authNeededRegexp.Match(stdoutStderr) {
-		return nil
-	}
-
-	errToReturn := &ErrAuthNeeded{}
-	htgettokenTimeoutRegexp := regexp.MustCompile(`htgettoken: Polling for response took longer than.*`)
-	if htgettokenTimeoutRegexp.Match(stdoutStderr) {
-		errToReturn.underlyingError = errHtgettokenTimeout
-	}
-	htgettokenPermissionDeniedRegexp := regexp.MustCompile(`htgettoken:.*403.*permission denied`)
-	if htgettokenPermissionDeniedRegexp.Match(stdoutStderr) {
-		errToReturn.underlyingError = errHtgettokenPermissionDenied
-	}
-
-	return errToReturn
-}
-
-type ErrAuthNeeded struct {
-	underlyingError error
-}
-
-func (e *ErrAuthNeeded) Error() string {
-	msg := "authentication needed for service to generate vault token"
-	if e.underlyingError != nil {
-		msg = fmt.Sprintf("%s: %s", msg, e.underlyingError.Error())
-	}
-	return msg
-}
-
-func (e *ErrAuthNeeded) Unwrap() error { return e.underlyingError }
 
 var (
 	errHtgettokenTimeout          = errors.New("htgettoken timeout to generate vault token")

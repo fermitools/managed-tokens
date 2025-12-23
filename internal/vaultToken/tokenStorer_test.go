@@ -320,64 +320,6 @@ func TestVaultStorerClientSetupCmdEnvironment(t *testing.T) {
 	}
 }
 
-func TestCheckStdOutForErrorAuthNeeded(t *testing.T) {
-	type testCase struct {
-		description          string
-		stdoutStderr         []byte
-		expectedErrTypeCheck error
-		expectedWrappedError error
-	}
-
-	testCases := []testCase{
-		{
-			"Random string - should not find result",
-			[]byte("This is a random string"),
-			nil,
-			nil,
-		},
-		{
-			"Auth needed",
-			[]byte("Authentication needed for myservice"),
-			&ErrAuthNeeded{},
-			nil,
-		},
-		{
-			"Auth needed - timeout",
-			[]byte("Authentication needed for myservice\n\n\nblahblah\n\nhtgettoken: Polling for response took longer than 2 minutes"),
-			&ErrAuthNeeded{},
-			errHtgettokenTimeout,
-		},
-		{
-			"Auth needed - permission denied",
-			[]byte("Authentication needed for myservice\n\n\nblahblah\n\nhtgettoken: blahblah HTTP Error 403: Forbidden: permission denied"),
-			&ErrAuthNeeded{},
-			errHtgettokenPermissionDenied,
-		},
-	}
-
-	for _, test := range testCases {
-		t.Run(
-			test.description,
-			func(t *testing.T) {
-				err := checkStdoutStderrForAuthNeededError(test.stdoutStderr)
-				if err == nil && test.expectedErrTypeCheck == nil {
-					return
-				}
-				var err1 *ErrAuthNeeded
-				if !errors.As(err, &err1) {
-					t.Errorf("Expected returned error to be of type *errAuthNeeded.  Got %T instead", err)
-					return
-				}
-
-				if errVal := errors.Unwrap(err); !errors.Is(errVal, test.expectedWrappedError) {
-					t.Errorf("Did not get expected wrapped error.  Expected error %v to be wrapped, but full error is %v.", test.expectedWrappedError, err)
-				}
-
-			},
-		)
-	}
-}
-
 func TestNewVaultStorerClient(t *testing.T) {
 	initialCredd := "credd1"
 	vaultServer := "vaultServer.host"
