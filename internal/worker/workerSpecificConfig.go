@@ -34,8 +34,9 @@ const (
 	// InteractiveTokenGetterOption is a worker-specific configuration option that represents whether the token getter should be interactive.
 	// It is supported by the GetToken WorkerType and StoreAndGetToken WorkerType
 	InteractiveTokenGetterOption
-	// AlternateTokenGetterOption is a worker-specific configuration option that represents whether to use an alternate token getter. It is // supported by the GetToken WorkerType and StoreAndGetToken , and the value of the AlternateTokenGetterOption must
-	// be of a type that implements the TokenGetter interface.
+	// AlternateTokenGetterOption is a worker-specific configuration option that represents whether to use an alternate token getter. It is
+	// supported by the GetToken WorkerType and StoreAndGetToken , and the value of the AlternateTokenGetterOption must be of a type that
+	// implements the TokenGetter interface.
 	AlternateTokenGetterOption
 	invalidWorkerSpecificConfigOption
 )
