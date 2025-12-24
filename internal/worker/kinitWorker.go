@@ -78,7 +78,7 @@ func (v *kinitSuccess) GetSuccess() bool {
 	return v.success
 }
 
-// GetKerberosTicketsWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
+// getKerberosTicketsWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // obtains kerberos tickets from the configured kerberos principals.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
 func getKerberosTicketsWorker(ctx context.Context, chans channelGroup) {

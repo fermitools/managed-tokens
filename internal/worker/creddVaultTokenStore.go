@@ -168,6 +168,8 @@ func storeServiceTokenForCreddFile(tokenRootPath, serviceName, credd string) err
 	return nil
 }
 
+// getServiceTokenForCreddLocation returns the path where the vault token for the given service and credd
+// is stored
 func getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd string) string {
 	funcLogger := log.WithFields(log.Fields{
 		"tokenRootPath": tokenRootPath,

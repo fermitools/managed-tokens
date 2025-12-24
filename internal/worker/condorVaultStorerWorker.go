@@ -96,7 +96,7 @@ func (v *vaultStorerSuccess) GetSuccess() bool {
 
 // TODO Tests for both this worker func and the helper
 
-// StoreAndGetTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
+// storeAndGetTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // stores a refresh token in the configured vault and obtains vault and bearer tokens.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
 func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
@@ -203,6 +203,13 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 	}
 }
 
+// storeAndGetTokensForSchedd handles the process of staging, storing, and retrieving vault tokens
+// for a given service and credd (credential daemon) combination. It performs the following steps:
+//  1. Attempts to stage a previously stored token file, handling cases where no prior token exists
+//     or where staging fails.
+//  2. Ensures that any new token obtained is stored for future use, provided the operation succeeds.
+//  3. Calls the provided tokenStorerAndGetter to obtain and store a new vault token, optionally
+//     using interactive mode.
 func storeAndGetTokensForSchedd(ctx context.Context, t tokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.StoreAndGetTokensForSchedd")
 	span.SetAttributes(attribute.String("tokenRootPath", tokenRootPath))
@@ -284,6 +291,7 @@ func storeAndGetTokensForSchedd(ctx context.Context, t tokenStorerAndGetter, ser
 	return nil
 }
 
+// tokenStorerAndGetter is a type that can get vault tokens and store them in a credd
 type tokenStorerAndGetter interface {
 	GetAndStoreToken(ctx context.Context, serviceName string, interactive bool) error
 	GetCredd() string

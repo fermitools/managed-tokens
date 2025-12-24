@@ -112,7 +112,7 @@ func (v *pushTokenSuccess) GetSuccess() bool {
 	return v.success
 }
 
-// PushTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
+// pushTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // pushes vault tokens to all the configured destination nodes.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
 func pushTokensWorker(ctx context.Context, chans channelGroup) {

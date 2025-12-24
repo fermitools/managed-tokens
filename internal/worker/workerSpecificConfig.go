@@ -68,14 +68,20 @@ func SetWorkerSpecificConfigOption(w WorkerType, option WorkerSpecificConfigOpti
 	})
 }
 
+// SetNumRetriesOption returns a ConfigOption that sets the number of retries for the specified WorkerType.
+// The numRetries parameter specifies how many times the worker should retry on failure.
 func SetNumRetriesOption(w WorkerType, numRetries uint) ConfigOption {
 	return SetWorkerSpecificConfigOption(w, NumRetriesOption, numRetries)
 }
 
+// SetRetrySleepOption returns a ConfigOption that sets the retry sleep duration for the specified WorkerType.
+// This option determines how long the worker should wait before retrying an operation.
 func SetRetrySleepOption(w WorkerType, retrySleep time.Duration) ConfigOption {
 	return SetWorkerSpecificConfigOption(w, RetrySleepOption, retrySleep)
 }
 
+// SetInteractiveTokenGetterOption sets the interactive option for the token getter of the specified WorkerType.
+// If the WorkerType is not valid for token getters, it returns a no-op ConfigOption.
 func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOption {
 	if !slices.Contains(slices.Collect(ValidTokenGetterWorkerTypes()), w) {
 		return ConfigOption(func(*Config) error { return nil }) // No-op
@@ -83,6 +89,8 @@ func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOptio
 	return SetWorkerSpecificConfigOption(w, InteractiveTokenGetterOption, interactive)
 }
 
+// SetAlternateTokenGetterOption sets an alternate TokenGetter for the specified WorkerType.
+// This allows customization of token retrieval logic for individual worker types.
 func SetAlternateTokenGetterOption(w WorkerType, tokenGetter TokenGetter) ConfigOption {
 	return SetWorkerSpecificConfigOption(w, AlternateTokenGetterOption, tokenGetter)
 }

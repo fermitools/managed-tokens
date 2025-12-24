@@ -70,14 +70,19 @@ type getTokenSuccess struct {
 	success bool
 }
 
+// GetService returns the service associated with the getTokenSuccess object
 func (v *getTokenSuccess) GetService() service.Service {
 	return v.Service
 }
 
+// GetSuccess returns whether the token operation was successful
 func (v *getTokenSuccess) GetSuccess() bool {
 	return v.success
 }
 
+// getTokenWorker is a worker that listens for worker.Config objects on chans.GetServiceConfigChan(), and for the received objects,
+// gets a vault token for the service defined in the worker.Config.  It returns when chans.GetServiceConfigChan() is closed,
+// and it will in turn close the other chans in the passed in ChannelsForWorkers
 func getTokenWorker(ctx context.Context, chans channelGroup) {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.GetTokenWorker")
 	defer span.End()
@@ -171,10 +176,12 @@ func getTokenWorker(ctx context.Context, chans channelGroup) {
 	}
 }
 
+// TokenGetter is a type that can get vault tokens
 type TokenGetter interface {
 	GetToken(ctx context.Context) error
 }
 
+// tokenGetterConfig is a configuration type that contains the needed information for getting vault tokens
 type tokenGetterConfig struct {
 	vaultServer   string
 	tokenRootPath string
