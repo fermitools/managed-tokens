@@ -46,6 +46,7 @@ func init() {
 	}
 }
 
+// VaultStorerClient is a client for storing tokens in a Vault server and Condor credd
 type VaultStorerClient struct {
 	credd              string
 	vaultServer        string
@@ -53,6 +54,9 @@ type VaultStorerClient struct {
 	CommandEnvironment *environment.CommandEnvironment
 }
 
+// NewVaultStorerClient creates and returns a new VaultStorerClient instance configured with the specified
+// credd host, vault server address, and command environment. If the provided environment's _condor_CREDD_HOST
+// differs from the given credd value, a copy of the environment is made with the credd value set appropriately.
 func NewVaultStorerClient(credd, vaultServer string, environ *environment.CommandEnvironment) *VaultStorerClient {
 	// If environ has a different _condor_CREDD_HOST than credd, make a copy of environ and set _condor_CREDD_HOST to credd
 	useEnv := environ
@@ -67,12 +71,16 @@ func NewVaultStorerClient(credd, vaultServer string, environ *environment.Comman
 	}
 }
 
+// WithVerbose enables verbose logging for the VaultStorerClient.
 func (v *VaultStorerClient) WithVerbose() *VaultStorerClient {
 	v.verbose = true
 	return v
 }
 
-func (v *VaultStorerClient) GetCredd() string       { return v.credd }
+// GetCredd returns the value of the credd field from the VaultStorerClient.
+func (v *VaultStorerClient) GetCredd() string { return v.credd }
+
+// GetVaultServer returns the address of the Vault server associated with the VaultStorerClient.
 func (v *VaultStorerClient) GetVaultServer() string { return v.vaultServer }
 
 // GetAndStoreToken gets and stores a vault token for the given serviceName in the configured vault server and credd.
@@ -132,7 +140,7 @@ func (v *VaultStorerClient) setupCmdWithEnvironment(ctx context.Context, service
 		"credd":       v.credd,
 	})
 
-	cmdArgs := v.getCmdArgs(ctx, serviceName)
+	cmdArgs := v.getCmdArgs(serviceName)
 	newEnv := v.setupCmdEnvironment()
 	getTokensAndStoreInVaultCmd := environment.EnvironmentWrappedCommand(ctx, newEnv, vaultExecutables["condor_vault_storer"], cmdArgs...)
 
@@ -145,7 +153,7 @@ func (v *VaultStorerClient) setupCmdWithEnvironment(ctx context.Context, service
 	return getTokensAndStoreInVaultCmd
 }
 
-func (v *VaultStorerClient) getCmdArgs(ctx context.Context, serviceName string) []string {
+func (v *VaultStorerClient) getCmdArgs(serviceName string) []string {
 	cmdArgs := make([]string, 0, 2)
 	if v.verbose {
 		cmdArgs = append(cmdArgs, "-v")
@@ -154,7 +162,7 @@ func (v *VaultStorerClient) getCmdArgs(ctx context.Context, serviceName string) 
 	return cmdArgs
 }
 
-// setupEnvironment sets _condor_CREDD_HOST and _condor_SEC_CREDENTIAL_GETTOKEN_OPTS in a new environment for condor_vault_storer
+// setupCmdEnvironment sets _condor_CREDD_HOST and _condor_SEC_CREDENTIAL_GETTOKEN_OPTS in a new environment for condor_vault_storer
 func (v *VaultStorerClient) setupCmdEnvironment() *environment.CommandEnvironment {
 	newEnv := v.CommandEnvironment.Copy()
 	newEnv.SetCondorCreddHost(v.credd)

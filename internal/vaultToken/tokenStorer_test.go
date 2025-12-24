@@ -227,7 +227,7 @@ func TestVaultStorerClientGetCmdArgs(t *testing.T) {
 		t.Run(
 			test.description,
 			func(t *testing.T) {
-				if cmdArgs := test.v.getCmdArgs(context.Background(), serviceName); !slices.Equal(cmdArgs, test.expectedArgs) {
+				if cmdArgs := test.v.getCmdArgs(serviceName); !slices.Equal(cmdArgs, test.expectedArgs) {
 					t.Errorf("cmdArgs slices are not equal. Expected %v, got %v", test.expectedArgs, cmdArgs)
 				}
 			},

@@ -106,6 +106,9 @@ func (n *nonInteractiveExecutor) executeCommand(ctx context.Context, c *exec.Cmd
 	return nil
 }
 
+// checkStdoutStderrForAuthNeededError inspects the provided stdout and stderr output for authentication-related errors.
+// If an authentication error is detected, it returns an ErrAuthNeeded, optionally wrapping a more specific underlying error
+// such as timeout or permission denied. If no authentication error is found, it returns nil.
 func checkStdoutStderrForAuthNeededError(stdoutStderr []byte) error {
 	authNeededRegexp := regexp.MustCompile(`Authentication needed for.*`)
 	if !authNeededRegexp.Match(stdoutStderr) {
@@ -125,6 +128,8 @@ func checkStdoutStderrForAuthNeededError(stdoutStderr []byte) error {
 	return errToReturn
 }
 
+// ErrAuthNeeded represents an error indicating that authentication is required.
+// It wraps an underlying error that provides more context about the authentication failure.
 type ErrAuthNeeded struct {
 	underlyingError error
 }
