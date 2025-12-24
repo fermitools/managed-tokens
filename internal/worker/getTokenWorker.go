@@ -155,10 +155,13 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 	defer span.End()
 
 	funcLogger := log.WithField("service", t.serviceName)
+	// If the vault token already exists, use it at its current location at vaultTokenPath. If it doesn't, create a temp file to use for getting the token,
+	// and then move it to vaultTokenPath
 	vaultTokenPath := getServiceTokenForCreddLocation(t.tokenRootPath, t.serviceName, "")
 	useVTPath := vaultTokenPath
 	if _, err := os.Stat(vaultTokenPath); errors.Is(err, fs.ErrNotExist) {
 		// Vault token doesn't exist, so we need to make a new one and move it into place
+		funcLogger.Debug("Vault token does not exist. Creating new temp file for vault token")
 		tempVaultTokenFile, err := os.CreateTemp(os.TempDir(), "managed_tokens_vault_token_")
 		if err != nil {
 			tracing.LogErrorWithTrace(span, funcLogger, "Could not create temp file for vault token in getTokenWorker")
@@ -177,7 +180,10 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 		// Send notification of error
 		funcLogger.Error("Could not create temp file for bearer token in getToken worker")
 	} else {
-		defer os.Remove(_bearerTokenFile.Name())
+		defer func() {
+			funcLogger.WithField("path", _bearerTokenFile.Name()).Debug("Removing bearer token temp file")
+			os.Remove(_bearerTokenFile.Name())
+		}()
 	}
 
 	verbose, err := contextStore.GetVerbose(ctx)
@@ -205,6 +211,7 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 
 	// Now move vault token into storage location if needed
 	if useVTPath != vaultTokenPath {
+		funcLogger.Debug("Moving new vault token into storage location")
 		if err := moveFileCrossDevice(useVTPath, vaultTokenPath); err != nil {
 			// If this fails, we want to still declare success. It just means that we will not have moved the token into
 			// its proper storage location, and we will be recreating it next time

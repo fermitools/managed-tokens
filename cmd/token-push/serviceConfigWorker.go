@@ -47,20 +47,22 @@ func startServiceConfigWorkerForProcessing(ctx context.Context, wt worker.Worker
 	)
 	defer span.End()
 
+	funcLogger := exeLogger.WithField("workerType", wt.String())
+
 	// If we don't have any serviceConfigs to process, don't start the worker
 	if len(serviceConfigs) == 0 || serviceConfigs == nil {
-		exeLogger.Debug("No serviceConfigs to process, not starting worker")
+		funcLogger.Debug("No serviceConfigs to process, not starting worker")
 		return nil
 	}
 
 	// Make sure we're trying to start a valid worker
 	if !slices.Contains(validWorkerTypes, wt) {
-		exeLogger.WithField("workerType", wt.String()).Error("invalid worker type")
+		funcLogger.Error("invalid worker type")
 		return nil
 	}
 	w := wt.Worker()
 	if w == nil {
-		exeLogger.WithField("workerType", wt.String()).Error("no worker found for worker type")
+		funcLogger.Error("no worker found for worker type")
 		return nil
 	}
 
