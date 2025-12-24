@@ -30,21 +30,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// TODO: Remove after implementing worker and logic for this
-// Notes:
-// 1. getDefaultVaultTokenLocation is already defined above and gets the vault token location we need -- DONE
-// 2. Add worker type "GetTokenWorker" to just get token.  It will have to instantiate the htgettokenClient, move in the staged vault token,
-//   call GetToken, and then validate the token.
-//  The worker can just throw out the BEARER TOKEN, so we can write the token to a tempfile and delete it after validation - DONE
-// 3.  Maybe all the workers could be combined into an interface, with a type switch to determine which worker to use? - DEFERRED
-// 4. CondorVaultTokenLocation is defined here and in the worker package.  We only need it here?, and export it perhaps - DONE
-// 5. Note - if we get a token with htgettoken, NOT for a schedd, we should save it - DONE
-
-// From caller POV:
-// c := NewHtgettokenClient(stuff)
-// err := GetToken(ctx, stuff, c)
-// END NOTES
-
 // Heavily borrowed from https://github.com/fnal-fife/jobsub-pnfs-dropbox-cleanup/blob/5168a5d0fc30284fa22350bcee42e55687f532eb/htgettokenClient.go
 
 // HtgettokenClient is a client for interacting with the htgettoken command-line tool.
