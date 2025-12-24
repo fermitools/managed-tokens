@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/fermitools/managed-tokens/internal/contextStore"
 	"github.com/fermitools/managed-tokens/internal/environment"
+	"github.com/fermitools/managed-tokens/internal/metrics"
 	"github.com/fermitools/managed-tokens/internal/notifications"
 	"github.com/fermitools/managed-tokens/internal/service"
 	"github.com/fermitools/managed-tokens/internal/tracing"
@@ -21,8 +24,46 @@ import (
 )
 
 // TODO: Add metrics
+var (
+	tokenGetTimestamp = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "managed_tokens",
+			Name:      "last_token_get_timestamp",
+			Help:      "The timestamp of the last successful obtaining of a service vault token that was not stored in a condor credd by the Managed Tokens Service",
+		},
+		[]string{
+			"service",
+		},
+	)
+	tokenGetDuration = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "managed_tokens",
+			Name:      "token_get_duration_seconds",
+			Help:      "Duration (in seconds) for a vault token to be obtained",
+		},
+		[]string{
+			"service",
+		},
+	)
+	getFailureCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "managed_tokens",
+		Name:      "failed_vault_token_get_count",
+		Help:      "The number of times the Managed Tokens Service failed to get a vault token",
+	},
+		[]string{
+			"service",
+		},
+	)
+)
 
 const getTokenDefaultTimeoutStr string = "60s"
+
+func init() {
+	metrics.MetricsRegistry.MustRegister(tokenGetTimestamp)
+	metrics.MetricsRegistry.MustRegister(tokenGetDuration)
+	metrics.MetricsRegistry.MustRegister(getFailureCount)
+
+}
 
 // getTokenSuccess is a type that conveys whether StoreAndGetTokenWorker successfully stores and obtains tokens for each service
 type getTokenSuccess struct {
@@ -155,6 +196,9 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 	defer span.End()
 
 	funcLogger := log.WithField("service", t.serviceName)
+
+	start := time.Now()
+
 	// If the vault token already exists, use it at its current location at vaultTokenPath. If it doesn't, create a temp file to use for getting the token,
 	// and then move it to vaultTokenPath
 	vaultTokenPath := getServiceTokenForCreddLocation(t.tokenRootPath, t.serviceName, "")
@@ -204,6 +248,7 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 
 	experiment, role := service.ExtractExperimentAndRoleFromServiceName(t.serviceName)
 	if _, err = h.GetToken(ctx, experiment, role, t.interactive); err != nil {
+		getFailureCount.WithLabelValues(t.serviceName).Inc()
 		err2 := fmt.Errorf("could not get vault token: %w", err)
 		tracing.LogErrorWithTrace(span, funcLogger, err2.Error())
 		return err2
@@ -219,5 +264,11 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 		}
 		tracing.LogSuccessWithTrace(span, funcLogger, "Successfully moved vault token into storage location")
 	}
+
+	dur := time.Since(start).Seconds()
+	tokenGetTimestamp.WithLabelValues(t.serviceName).SetToCurrentTime()
+	tokenGetDuration.WithLabelValues(t.serviceName).Set(dur)
+
+	span.SetStatus(codes.Ok, "Successfully obtained vault token for experiment/role")
 	return nil
 }
