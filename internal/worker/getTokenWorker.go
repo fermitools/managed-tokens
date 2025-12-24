@@ -23,7 +23,6 @@ import (
 	"github.com/fermitools/managed-tokens/internal/vaultToken"
 )
 
-// TODO: Add metrics
 var (
 	tokenGetTimestamp = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{

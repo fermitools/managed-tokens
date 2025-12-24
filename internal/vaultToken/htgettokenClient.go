@@ -22,12 +22,13 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/fermitools/managed-tokens/internal/environment"
 	"github.com/lestrrat-go/jwx/jwt"
 	scitokens "github.com/scitokens/scitokens-go"
 	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/fermitools/managed-tokens/internal/environment"
 )
 
 // Heavily borrowed from https://github.com/fnal-fife/jobsub-pnfs-dropbox-cleanup/blob/5168a5d0fc30284fa22350bcee42e55687f532eb/htgettokenClient.go
