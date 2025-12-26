@@ -151,18 +151,23 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 
 					scheddLogger := configLogger.WithField("schedd", schedd)
 
-					ts := vaultToken.NewVaultStorerClient(schedd, sc.VaultServer, &sc.CommandEnvironment)
+					var useTokenStorerAndGetter TokenStorerAndGetter
+					if alternateTokenStorerAndGetter, err := getAlternateTokenStorerAndGetterOptionFromConfig(*sc, StoreAndGetToken); err == nil && alternateTokenStorerAndGetter != nil {
+						useTokenStorerAndGetter = alternateTokenStorerAndGetter
+						scheddLogger.Debug("Using alternate token storer and getter from service config")
+					} else {
+						useTokenStorerAndGetter = vaultToken.NewVaultStorerClient(schedd, sc.VaultServer, &sc.CommandEnvironment)
+					}
 
 					vaultStorerContext, vaultStorerCancel := context.WithTimeout(ctx, vaultStorerTimeout)
 					defer vaultStorerCancel()
 
 					if err := storeAndGetTokensForSchedd(
 						vaultStorerContext,
-						ts,
+						useTokenStorerAndGetter,
 						sc.Service.Name(),
 						sc.ServiceCreddVaultTokenPathRoot,
 						interactive); err != nil {
-						// if err := storeAndGetTokensForSchedd(vaultStorerContext, &sc.CommandEnvironment, sc.ServiceCreddVaultTokenPathRoot, ts); err != nil {
 						success.success = false
 
 						// Check to see if we need to report a specific error
@@ -208,9 +213,9 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 //  1. Attempts to stage a previously stored token file, handling cases where no prior token exists
 //     or where staging fails.
 //  2. Ensures that any new token obtained is stored for future use, provided the operation succeeds.
-//  3. Calls the provided tokenStorerAndGetter to obtain and store a new vault token, optionally
+//  3. Calls the provided TokenStorerAndGetter to obtain and store a new vault token, optionally
 //     using interactive mode.
-func storeAndGetTokensForSchedd(ctx context.Context, t tokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
+func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.StoreAndGetTokensForSchedd")
 	span.SetAttributes(attribute.String("tokenRootPath", tokenRootPath))
 	span.SetAttributes(attribute.String("service", serviceName))
@@ -291,8 +296,8 @@ func storeAndGetTokensForSchedd(ctx context.Context, t tokenStorerAndGetter, ser
 	return nil
 }
 
-// tokenStorerAndGetter is a type that can get vault tokens and store them in a credd
-type tokenStorerAndGetter interface {
+// TokenStorerAndGetter is a type that can get vault tokens and store them in a credd
+type TokenStorerAndGetter interface {
 	GetAndStoreToken(ctx context.Context, serviceName string, interactive bool) error
 	GetCredd() string
 	GetVaultServer() string
