@@ -35,9 +35,13 @@ const (
 	// It is supported by the GetToken WorkerType and StoreAndGetToken WorkerType
 	InteractiveTokenGetterOption
 	// AlternateTokenGetterOption is a worker-specific configuration option that represents whether to use an alternate token getter. It is
-	// supported by the GetToken WorkerType and StoreAndGetToken , and the value of the AlternateTokenGetterOption must be of a type that
+	// supported by the GetToken WorkerType, and the value of the AlternateTokenGetterOption must be of a type that
 	// implements the TokenGetter interface.
 	AlternateTokenGetterOption
+	// AlternateTokenStorerAndGetterOption is a worker-specific configuration option that represents whether to use an alternate token storer and getter. It is
+	// supported by the StoreAndGetToken WorkerType, and the value of the AlternateTokenStorerAndGetterOption must be of a type that
+	// implements the TokenStorerAndGetter interface.
+	AlternateTokenStorerAndGetterOption
 	invalidWorkerSpecificConfigOption
 )
 
@@ -93,6 +97,12 @@ func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOptio
 // This allows customization of token retrieval logic for individual worker types.
 func SetAlternateTokenGetterOption(w WorkerType, tokenGetter TokenGetter) ConfigOption {
 	return SetWorkerSpecificConfigOption(w, AlternateTokenGetterOption, tokenGetter)
+}
+
+// SetAlternateTokenStorerAndGetterOption sets an alternate TokenGetter for the specified WorkerType.
+// This allows customization of token retrieval logic for individual worker types.
+func SetAlternateTokenStorerAndGetterOption(w WorkerType, ts TokenStorerAndGetter) ConfigOption {
+	return SetWorkerSpecificConfigOption(w, AlternateTokenStorerAndGetterOption, ts)
 }
 
 // Exported utility helpers
@@ -219,6 +229,29 @@ func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGette
 	valInterface, ok := val.(TokenGetter)
 	if !ok {
 		return nil, fmt.Errorf("value for workerType %s is not of type TokenGetter.  Got type %T", w, val)
+	}
+
+	return valInterface, nil
+}
+
+// getAlternateTokenStorerAndGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
+func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (TokenStorerAndGetter, error) {
+	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return nil, errors.New("no token getter configuration found for the given worker type")
+		}
+		return nil, err
+	}
+
+	val, ok := m[AlternateTokenStorerAndGetterOption]
+	if !ok {
+		return nil, fmt.Errorf("no AlternateTokenStorerAndGetterOption found for workerType %s in workerSpecificConfig", w)
+	}
+
+	valInterface, ok := val.(TokenStorerAndGetter)
+	if !ok {
+		return nil, fmt.Errorf("value for workerType %s is not of type TokenStorerAndGetter.  Got type %T", w, val)
 	}
 
 	return valInterface, nil
