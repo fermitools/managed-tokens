@@ -14,20 +14,20 @@ import (
 
 func TestGetTokenWorker(t *testing.T) {
 	ctx := context.Background()
-	chans := NewChannelsForWorkers(1)
-	t.Cleanup(func() {
-		select {
-		case _, ok := <-chans.GetSuccessChan():
-			if ok {
-				chans.closeWorkerSendChans()
-			}
-		default:
-		}
-	})
 
 	// bad case
 	t.Run("get token worker fails", func(t *testing.T) {
 		t.Parallel()
+		chans := NewChannelsForWorkers(1)
+		t.Cleanup(func() {
+			select {
+			case _, ok := <-chans.GetSuccessChan():
+				if ok {
+					chans.closeWorkerSendChans()
+				}
+			default:
+			}
+		})
 		s := service.NewService("testbad_service")
 		sc, _ := NewConfig(s)
 		chans.GetServiceConfigChan() <- sc
@@ -66,7 +66,7 @@ func TestGetTokenWorker(t *testing.T) {
 			}
 		})
 		f := &fakeTokenGetter{}
-		sc2, _ := NewConfig(s2, SetWorkerSpecificConfigOption(GetToken, AlternateTokenGetterOption, f))
+		sc2, _ := NewConfig(s2, SetAlternateTokenGetterOption(GetToken, f))
 		chans2.GetServiceConfigChan() <- sc2
 		close(chans2.GetServiceConfigChan())
 		go getTokenWorker(ctx, chans2)

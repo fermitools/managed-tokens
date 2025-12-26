@@ -139,7 +139,7 @@ func getTokenWorker(ctx context.Context, chans channelGroup) {
 			environ:       &sc.CommandEnvironment,
 		} // Default
 
-		if alternateTokenGetter, err := getAlternateTokenGetterOptionFromConfig(*sc, GetToken); err == nil || alternateTokenGetter != nil {
+		if alternateTokenGetter, err := getAlternateTokenGetterOptionFromConfig(*sc, GetToken); err == nil && alternateTokenGetter != nil {
 			useTokenGetter = alternateTokenGetter
 			scLogger.Debug("Using alternate token getter from service config")
 		}
