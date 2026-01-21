@@ -17,16 +17,15 @@
 package vaultToken
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/user"
+	"path"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-
-	"github.com/fermitools/managed-tokens/internal/environment"
 )
 
 // Borrowed from hashicorp's vault API, since we ONLY need this func
@@ -75,11 +74,7 @@ func GetAllVaultTokenLocations(serviceName string) ([]string, error) {
 		vaultTokenLocations = append(vaultTokenLocations, defaultLocation)
 	}
 
-	condorLocation, err := getCondorVaultTokenLocation(serviceName)
-	if err != nil {
-		funcLogger.Error("Could not get condor vault location")
-		return nil, err
-	}
+	condorLocation := GetCondorVaultTokenLocation(serviceName)
 	if _, err := os.Stat(condorLocation); err == nil { // Check to see if the file exists and we can read it
 		vaultTokenLocations = append(vaultTokenLocations, condorLocation)
 	}
@@ -112,15 +107,20 @@ func RemoveServiceVaultTokens(serviceName string) error {
 	return nil
 }
 
-// getCondorVaultTokenLocation returns the location of vault token that HTCondor uses based on the current user's UID
-func getCondorVaultTokenLocation(serviceName string) (string, error) {
+// GetCondorVaultTokenLocation returns the location of vault token that HTCondor uses based on the current user's UID
+// If for some reason the current user cannot be determined, we will fall back to using os.GetUid(), but that doesn't cache the user info,
+// which is why user.Current() is preferred.
+func GetCondorVaultTokenLocation(serviceName string) string {
+	var uid string
 	currentUser, err := user.Current()
 	if err != nil {
-		log.WithField("service", serviceName).Error(err)
-		return "", err
+		log.WithField("service", serviceName).Debug("Could not get current user. Will attempt again using os.Getuid().")
+		uid = strconv.Itoa(os.Getuid())
+	} else {
+		uid = currentUser.Uid
 	}
-	currentUID := currentUser.Uid
-	return fmt.Sprintf("/tmp/vt_u%s-%s", currentUID, serviceName), nil
+	filename := fmt.Sprintf("vt_u%s-%s", uid, serviceName)
+	return path.Join(os.TempDir(), filename)
 }
 
 // getDefaultVaultTokenLocation returns the location of vault token that most OSG grid tools use based on the current user's UID
@@ -136,12 +136,8 @@ func getDefaultVaultTokenLocation() (string, error) {
 
 func validateServiceVaultToken(serviceName string) error {
 	funcLogger := log.WithField("service", serviceName)
-	vaultTokenFilename, err := getCondorVaultTokenLocation(serviceName)
-	if err != nil {
-		funcLogger.Error("Could not get default vault token location")
-		return err
-	}
 
+	vaultTokenFilename := GetCondorVaultTokenLocation(serviceName)
 	if err := validateVaultToken(vaultTokenFilename); err != nil {
 		funcLogger.Error("Could not validate vault token")
 		return err
@@ -167,35 +163,5 @@ func validateVaultToken(vaultTokenFilename string) error {
 			errString,
 		}
 	}
-	return nil
-}
-
-// TODO STILL UNDER DEVELOPMENT.  Export when ready, and add tracing
-func GetToken(ctx context.Context, userPrincipal, serviceName, vaultServer string, environ environment.CommandEnvironment) error {
-	htgettokenArgs := []string{
-		"-d",
-		"-a",
-		vaultServer,
-		"-i",
-		serviceName,
-	}
-
-	htgettokenCmd := environment.EnvironmentWrappedCommand(ctx, &environ, vaultExecutables["htgettoken"], htgettokenArgs...)
-	// TODO Get rid of all this when it works
-	htgettokenCmd.Stdout = os.Stdout
-	htgettokenCmd.Stderr = os.Stderr
-	log.Debug(htgettokenCmd.Args)
-
-	log.WithField("service", serviceName).Info("Running htgettoken to get vault and bearer tokens")
-	if stdoutStderr, err := htgettokenCmd.CombinedOutput(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			log.WithField("service", serviceName).Error("Context timeout")
-			return ctx.Err()
-		}
-		log.WithField("service", serviceName).Errorf("Could not get vault token:\n%s", string(stdoutStderr[:]))
-		return err
-	}
-
-	log.WithField("service", serviceName).Debug("Successfully got vault token")
 	return nil
 }

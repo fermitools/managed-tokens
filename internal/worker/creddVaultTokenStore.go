@@ -25,6 +25,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/fermitools/managed-tokens/internal/vaultToken"
 )
 
 // These are functions that deal with staging and storing credd-specific vault tokens
@@ -40,13 +42,24 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 	restorePriorTokenFunc = func() error { return nil }
 
 	// Check for token at condorVaultTokenLocation, and move it out if needed
-	condorVaultTokenLocation := getCondorVaultTokenLocation(serviceName)
-	// TODO Strengthen this file check.  One more func that checks if a file exists or not, maybe goes into utils
-	if _, err := os.Stat(condorVaultTokenLocation); !errors.Is(err, os.ErrNotExist) {
-		if err != nil {
-			funcLogger.Errorf("Could not stat condor vault token file that exists: %s", err)
-			return restorePriorTokenFunc, err
-		}
+	// 1. If file doesn't exist, do nothing, return
+	// 2. If file exists, but can't stat it, return error, do nothing so we overwrite with good file
+	// 3. If file exists, and there is no error stat-ing it, stash it
+
+	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
+
+	_, err := os.Stat(condorVaultTokenLocation)
+	switch {
+	// (1)
+	case errors.Is(err, os.ErrNotExist):
+		funcLogger.Debugf("No existing condor vault token at %s.  No backup needed.", condorVaultTokenLocation)
+		return restorePriorTokenFunc, nil
+	// (2)
+	case err != nil:
+		funcLogger.Errorf("Could not stat condor vault token file that exists at %s: %s", condorVaultTokenLocation, err)
+		return restorePriorTokenFunc, err
+	// (3)
+	default:
 		// We had a vault token at condorVaultTokenLocation.  Move it to a temp file for now
 		previousTokenTempFile, err := os.CreateTemp(os.TempDir(), "managed_tokens_condor_vault_token")
 		if err != nil {
@@ -66,6 +79,7 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 			funcLogger.Error("Could not move currently-existing condor vault token to staging location")
 			return restorePriorTokenFunc, err
 		}
+		// Create a func to return that will restore the now-stashed token back to condorVaultTokenLocation
 		restorePriorTokenFunc = func() error {
 			// TODO:  This part is not tested.  Think about how to do that
 			if err := moveFileCrossDevice(previousTokenTempFile.Name(), condorVaultTokenLocation); err != nil {
@@ -87,7 +101,6 @@ func backupCondorVaultToken(serviceName string) (restorePriorTokenFunc func() er
 		}
 		return restorePriorTokenFunc, nil
 	}
-	return
 }
 
 // stageStoredTokenFile checks to see if there already exists a vault token for the given service and
@@ -98,7 +111,7 @@ func stageStoredTokenFile(tokenRootPath, serviceName, credd string) error {
 		"service": serviceName,
 		"credd":   credd,
 	})
-	condorVaultTokenLocation := getCondorVaultTokenLocation(serviceName)
+	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
 
 	storedServiceCreddTokenLocation := getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd)
 	if _, err := os.Stat(storedServiceCreddTokenLocation); errors.Is(err, os.ErrNotExist) {
@@ -136,7 +149,7 @@ func storeServiceTokenForCreddFile(tokenRootPath, serviceName, credd string) err
 		"service": serviceName,
 		"credd":   credd,
 	})
-	condorVaultTokenLocation := getCondorVaultTokenLocation(serviceName)
+	condorVaultTokenLocation := vaultToken.GetCondorVaultTokenLocation(serviceName)
 	storedServiceCreddTokenLocation := getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd)
 
 	funcLogger.Debug("Attempting to move condor vault token to service-credd vault token storage path")
@@ -155,20 +168,8 @@ func storeServiceTokenForCreddFile(tokenRootPath, serviceName, credd string) err
 	return nil
 }
 
-// getCondorVaultTokenLocation returns the location of vault token that HTCondor uses based on the current user's UID
-func getCondorVaultTokenLocation(serviceName string) string {
-	var uid string
-	currentUser, err := user.Current()
-	if err != nil {
-		log.WithField("service", serviceName).Error(`Could not get current user.  Will use string "000" instead`)
-		uid = "000"
-	} else {
-		uid = currentUser.Uid
-	}
-	filename := fmt.Sprintf("vt_u%s-%s", uid, serviceName)
-	return path.Join(os.TempDir(), filename)
-}
-
+// getServiceTokenForCreddLocation returns the path where the vault token for the given service and credd
+// is stored
 func getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd string) string {
 	funcLogger := log.WithFields(log.Fields{
 		"tokenRootPath": tokenRootPath,
@@ -182,6 +183,11 @@ func getServiceTokenForCreddLocation(tokenRootPath, serviceName, credd string) s
 		uid = "000"
 	} else {
 		uid = currentUser.Uid
+	}
+
+	if credd == "" {
+		tokenFilename := fmt.Sprintf("vt_u%s-%s", uid, serviceName)
+		return path.Join(tokenRootPath, tokenFilename)
 	}
 
 	tokenFilename := fmt.Sprintf("vt_u%s-%s-%s", uid, credd, serviceName)

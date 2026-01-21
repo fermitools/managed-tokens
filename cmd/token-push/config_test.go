@@ -49,7 +49,7 @@ func skipForCI(t *testing.T) {
 // TestGetServiceConfigOverrideKeyOrGlobalKey checks that we properly return the configuration path for a given set of configuration
 // entries.  We want to ensure that if there is a service-level override of a global key, that we properly return that service-level
 // override path
-func TestGetServiceConfigOverrideKeyOrGlobalKey(t *testing.T) {
+func TestGetConfigOverridePath(t *testing.T) {
 	randomKey := func() string { return fmt.Sprintf("key%d", rand.Intn(2^32-1)) }
 	checkOverriddenAndGetKey := func(overridden bool, key string) string {
 		if overridden {
@@ -105,7 +105,7 @@ func TestGetServiceConfigOverrideKeyOrGlobalKey(t *testing.T) {
 				testKey := test.setupTestFunc()
 				expectedConfigPath := test.expectedConfigPathFunc(test.expectedOverridden, testKey)
 
-				configPath, overridden := getServiceConfigOverrideKeyOrGlobalKey(serviceConfigPath, testKey)
+				configPath, overridden := getConfigOverridePath(serviceConfigPath, testKey)
 				viper.Reset()
 				if overridden != test.expectedOverridden {
 					t.Errorf("Got unexpected overridden bool.  Expected %t, got %t", test.expectedOverridden, overridden)
@@ -1234,8 +1234,8 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 			testConfigSetup: func() {
 				viper.Set("workerType.GetKerberosTickets.numRetries", 1)
 				viper.Set("workerType.GetKerberosTickets.retrySleep", "1s")
-				viper.Set("workerType.StoreAndGetTokenInteractive.numRetries", 1)
-				viper.Set("workerType.StoreAndGetTokenInteractive.retrySleep", "1s")
+				viper.Set("workerType.GetToken.numRetries", 1)
+				viper.Set("workerType.GetToken.retrySleep", "1s")
 				viper.Set("workerType.StoreAndGetToken.numRetries", 1)
 				viper.Set("workerType.StoreAndGetToken.retrySleep", "1s")
 				viper.Set("workerType.PingAggregator.numRetries", 1)
@@ -1244,23 +1244,23 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 				viper.Set("workerType.PushTokens.retrySleep", "1s")
 			},
 			expected: map[worker.WorkerType]workerRetryConfig{
-				worker.GetKerberosTicketsWorkerType: {
+				worker.GetKerberosTickets: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.StoreAndGetTokenInteractiveWorkerType: {
+				worker.GetToken: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.StoreAndGetTokenWorkerType: {
+				worker.StoreAndGetToken: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.PingAggregatorWorkerType: {
+				worker.PingAggregator: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
-				worker.PushTokensWorkerType: {
+				worker.PushTokens: {
 					numRetries: 1,
 					retrySleep: 1 * time.Second,
 				},
@@ -1312,7 +1312,7 @@ func TestCreateWorkerRetryMap(t *testing.T) {
 
 func TestSetDefaultWorkerRetryMap(t *testing.T) {
 	m := setDefaultWorkerRetryMap()
-	for _, wt := range validWorkerTypes {
+	for wt := range worker.ValidRetryWorkerTypes() {
 		val, ok := m[wt]
 		if !ok {
 			t.Errorf("Expected worker type %s not found in map", wt)
@@ -1333,7 +1333,7 @@ func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
 	}{
 		{
 			name:          "Valid configuration",
-			workerType:    worker.GetKerberosTicketsWorkerType,
+			workerType:    worker.GetKerberosTickets,
 			checkTimeout:  10 * time.Second,
 			numRetries:    3,
 			retrySleep:    2 * time.Second,
@@ -1341,7 +1341,7 @@ func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
 		},
 		{
 			name:          "Invalid configuration - timeout less than retry duration",
-			workerType:    worker.GetKerberosTicketsWorkerType,
+			workerType:    worker.GetKerberosTickets,
 			checkTimeout:  5 * time.Second,
 			numRetries:    3,
 			retrySleep:    2 * time.Second,
@@ -1367,6 +1367,72 @@ func TestGetAndCheckRetryInfoFromConfig(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.numRetries, numRetries)
 			assert.Equal(t, tt.retrySleep, retrySleep)
+		})
+	}
+}
+func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
+	configPath := "configroot"
+
+	type testCase struct {
+		description      string
+		overrideValue    string
+		expectedType     worker.WorkerType
+		expectedOverride bool
+		setupFunc        func()
+	}
+
+	testCases := []testCase{
+		{
+			description:      "No override key set, should return default",
+			overrideValue:    "",
+			expectedType:     worker.StoreAndGetToken,
+			expectedOverride: false,
+			setupFunc:        func() {},
+		},
+		{
+			description:      "Valid override: storeAndGetToken",
+			overrideValue:    "storeAndGetToken",
+			expectedType:     worker.StoreAndGetToken,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "storeAndGetToken")
+			},
+		},
+		{
+			description:      "Valid override: getToken",
+			overrideValue:    "getToken",
+			expectedType:     worker.GetToken,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "getToken")
+			},
+		},
+		{
+			description:      "Invalid override value, should return default",
+			overrideValue:    "InvalidType",
+			expectedType:     worker.StoreAndGetToken,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "InvalidType")
+			},
+		},
+		{
+			description:      "Empty override value, should return default",
+			overrideValue:    "",
+			expectedType:     worker.StoreAndGetToken,
+			expectedOverride: true,
+			setupFunc: func() {
+				viper.Set(configPath+".tokenGetterOverride", "")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(func() { viper.Reset() })
+			tc.setupFunc()
+			assert.Equal(t, tc.expectedType, getTokenGetterOverrideFromConfiguration(configPath))
 		})
 	}
 }

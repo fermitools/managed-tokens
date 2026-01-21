@@ -19,80 +19,117 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path"
 	"slices"
+	"strings"
 	"testing"
 
-	"github.com/fermitools/managed-tokens/internal/contextStore"
 	"github.com/fermitools/managed-tokens/internal/environment"
 )
 
-type MockTokenStorer struct {
-	tokenStorerFunc func(context.Context, *environment.CommandEnvironment) error
-	tokenValidator  func() error
-}
-
-func (t *MockTokenStorer) GetServiceName() string { return "mockService" }
-func (t *MockTokenStorer) GetCredd() string       { return "mockCredd" }
-func (t *MockTokenStorer) GetVaultServer() string { return "mockVaultServer" }
-func (t *MockTokenStorer) validateToken() error {
-	return t.tokenValidator()
-}
-func (t *MockTokenStorer) getTokensAndStoreInVault(ctx context.Context, environ *environment.CommandEnvironment) error {
-	return t.tokenStorerFunc(ctx, environ)
-}
-
-func TestStoreAndValidateToken(t *testing.T) {
-	type testCase struct {
-		description string
-		tokenStorer
-		expectedErr error
+func TestVaultStorerClientGetAndStoreToken(t *testing.T) {
+	v := &VaultStorerClient{
+		credd:              "mockCredd",
+		vaultServer:        "mockVaultServer",
+		CommandEnvironment: new(environment.CommandEnvironment),
 	}
+	serviceName := "test_service"
 
-	storerError := errors.New("Error storing vault token")
-	storerErrorAuthNeededTimeout := &ErrAuthNeeded{underlyingError: errHtgettokenTimeout}
-	validatorError := errors.New("Error validating vault token")
+	type testCase struct {
+		description            string
+		ctx                    context.Context
+		interactive            bool
+		vaultStorerCommandMock func() (cleanup func(), err error)
+		expectedErrNil         bool
+		errContains            string
+	}
 
 	testCases := []testCase{
 		{
-			"No-error case",
-			&MockTokenStorer{
-				func(context.Context, *environment.CommandEnvironment) error { return nil },
-				func() error { return nil },
+			"Valid case",
+			context.Background(),
+			false,
+			func() (func(), error) {
+				temp := t.TempDir()
+				oldPath := vaultExecutables["condor_vault_storer"]
+				vaultExecutables["condor_vault_storer"] = path.Join(temp, "mock_condor_vault_storer_success.sh")
+				cleanupFunc := func() {
+					vaultExecutables["condor_vault_storer"] = oldPath
+				}
+
+				// Write the fake script
+				scriptContent := `#!/bin/bash
+exit 0
+`
+				if err := os.WriteFile(vaultExecutables["condor_vault_storer"], []byte(scriptContent), 0755); err != nil {
+					return cleanupFunc, errors.New("Could not write mock condor_vault_storer script")
+				}
+				return cleanupFunc, nil
 			},
-			nil,
+			true,
+			"",
 		},
 		{
-			"Bad storer, good validator",
-			&MockTokenStorer{
-				func(context.Context, *environment.CommandEnvironment) error { return storerError },
-				func() error { return nil },
+			"Valid case, interactive",
+			context.Background(),
+			true,
+			func() (func(), error) {
+				temp := t.TempDir()
+				oldPath := vaultExecutables["condor_vault_storer"]
+				vaultExecutables["condor_vault_storer"] = path.Join(temp, "mock_condor_vault_storer_success.sh")
+				cleanupFunc := func() {
+					vaultExecutables["condor_vault_storer"] = oldPath
+				}
+
+				// Write the fake script
+				scriptContent := `#!/bin/bash
+exit 0
+`
+				if err := os.WriteFile(vaultExecutables["condor_vault_storer"], []byte(scriptContent), 0755); err != nil {
+					return cleanupFunc, errors.New("Could not write mock condor_vault_storer script")
+				}
+				return cleanupFunc, nil
 			},
-			storerError,
+			true,
+			"",
 		},
 		{
-			"Good storer, bad validator",
-			&MockTokenStorer{
-				func(context.Context, *environment.CommandEnvironment) error { return nil },
-				func() error { return validatorError },
-			},
-			validatorError,
+			"Context already expired",
+			func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			}(),
+			false,
+			func() (func(), error) { return func() {}, nil },
+			false,
+			"context canceled",
 		},
 		{
-			"Bad storer, bad validator",
-			&MockTokenStorer{
-				func(context.Context, *environment.CommandEnvironment) error { return storerError },
-				func() error { return validatorError },
+			"Command fails",
+			context.Background(),
+			false,
+			func() (func(), error) {
+				temp := t.TempDir()
+				oldPath := vaultExecutables["condor_vault_storer"]
+				vaultExecutables["condor_vault_storer"] = path.Join(temp, "mock_condor_vault_storer_success.sh")
+				cleanupFunc := func() {
+					vaultExecutables["condor_vault_storer"] = oldPath
+				}
+
+				// Write the fake script
+				scriptContent := `#!/bin/bash
+exit 1
+`
+				if err := os.WriteFile(vaultExecutables["condor_vault_storer"], []byte(scriptContent), 0755); err != nil {
+					return cleanupFunc, errors.New("Could not write mock condor_vault_storer script")
+				}
+				return cleanupFunc, nil
 			},
-			storerError,
-		},
-		{
-			"Auth needed - timeout error, good validator",
-			&MockTokenStorer{
-				func(context.Context, *environment.CommandEnvironment) error { return storerErrorAuthNeededTimeout },
-				func() error { return nil },
-			},
-			storerErrorAuthNeededTimeout,
+			false,
+			"error getting and storing vault token on credd",
 		},
 	}
 
@@ -100,26 +137,45 @@ func TestStoreAndValidateToken(t *testing.T) {
 		t.Run(
 			test.description,
 			func(t *testing.T) {
-				if err := storeAndValidateToken(
-					context.Background(),
-					test.tokenStorer,
-					&environment.CommandEnvironment{},
-				); !errors.Is(test.expectedErr, err) {
-					t.Errorf("Expected error %s.  Got %s", test.expectedErr, err)
+				cleanup, err := test.vaultStorerCommandMock()
+				if err != nil {
+					cleanup()
+					t.Fatalf("Could not setup vault storer command mock: %s", err)
+				}
+				defer cleanup()
+				err = v.GetAndStoreToken(test.ctx, serviceName, test.interactive)
+				if test.expectedErrNil {
+					if err != nil {
+						t.Errorf("Expected nil error, got %s", err)
+					}
+					return // We expected err to be nil and it was, so we don't need to check any further
+				}
+
+				// Not expecting nil error
+				if err == nil {
+					t.Errorf("Expected non-nil error, got nil")
+				}
+
+				if !strings.Contains(err.Error(), test.errContains) {
+					t.Errorf("Error does not contain expected string.  Expected to contain %s, got %s", test.errContains, err)
 				}
 			},
 		)
-
 	}
 
 }
 
-func TestSetupCmdWithEnvironmentForTokenStorer(t *testing.T) {
-	tokenStorer := &MockTokenStorer{}
-	environ := new(environment.CommandEnvironment)
+func TestVaultStorerClientSetupCmdWithEnvironment(t *testing.T) {
+	v := &VaultStorerClient{
+		credd:              "mockCredd",
+		vaultServer:        "mockVaultServer",
+		CommandEnvironment: new(environment.CommandEnvironment),
+	}
 
-	expected := exec.CommandContext(context.Background(), vaultExecutables["condor_vault_storer"], tokenStorer.GetServiceName())
-	result := setupCmdWithEnvironmentForTokenStorer(context.Background(), tokenStorer, environ)
+	serviceName := "test_service"
+
+	expected := exec.CommandContext(context.Background(), vaultExecutables["condor_vault_storer"], serviceName)
+	result := v.setupCmdWithEnvironment(context.Background(), serviceName)
 
 	if result.Path != expected.Path {
 		t.Errorf("Got wrong executable to run.  Expected %s, got %s", expected.Path, result.Path)
@@ -133,31 +189,36 @@ func TestSetupCmdWithEnvironmentForTokenStorer(t *testing.T) {
 		"_condor_SEC_CREDENTIAL_GETTOKEN_OPTS=-a mockVaultServer",
 	}
 	for _, checkEnv := range checkEnvVars {
-		if !slices.Contains[[]string](result.Env, checkEnv) {
+		if !slices.Contains(result.Env, checkEnv) {
 			t.Errorf("Result cmd does not have right environment variables.  Missing %s", checkEnv)
 		}
 	}
 }
 
-func TestGetCmdArgsForTokenStorer(t *testing.T) {
+func TestVaultStorerClientGetCmdArgs(t *testing.T) {
+	baseV := &VaultStorerClient{
+		credd:              "test.credd",
+		vaultServer:        "test.vault.server",
+		CommandEnvironment: &environment.CommandEnvironment{},
+	}
+
 	serviceName := "testService"
+
 	type testCase struct {
 		description  string
-		verboseSetup func() context.Context
+		v            *VaultStorerClient
 		expectedArgs []string
 	}
 
 	testCases := []testCase{
 		{
 			"No verbose",
-			func() context.Context { return context.Background() },
+			baseV,
 			[]string{serviceName},
 		},
 		{
 			"Verbose",
-			func() context.Context {
-				return contextStore.WithVerbose(context.Background())
-			},
+			func(t *testing.T) *VaultStorerClient { return copyTestVaultStorerClient(baseV).WithVerbose() }(t),
 			[]string{"-v", serviceName},
 		},
 	}
@@ -166,8 +227,7 @@ func TestGetCmdArgsForTokenStorer(t *testing.T) {
 		t.Run(
 			test.description,
 			func(t *testing.T) {
-				ctx := test.verboseSetup()
-				if cmdArgs := getCmdArgsForTokenStorer(ctx, serviceName); !slices.Equal(cmdArgs, test.expectedArgs) {
+				if cmdArgs := test.v.getCmdArgs(serviceName); !slices.Equal(cmdArgs, test.expectedArgs) {
 					t.Errorf("cmdArgs slices are not equal. Expected %v, got %v", test.expectedArgs, cmdArgs)
 				}
 			},
@@ -176,69 +236,72 @@ func TestGetCmdArgsForTokenStorer(t *testing.T) {
 
 }
 
-func TestSetupEnvironmentForTokenStorer(t *testing.T) {
-	credd := "test.credd"
-	vaultServer := "test.vault.server"
+func TestVaultStorerClientSetupCmdEnvironment(t *testing.T) {
+	baseV := &VaultStorerClient{
+		credd:              "test.credd",
+		vaultServer:        "test.vault.server",
+		CommandEnvironment: &environment.CommandEnvironment{},
+	}
 
 	type testCase struct {
 		description     string
-		oldEnvfunc      func() *environment.CommandEnvironment
+		v               *VaultStorerClient
 		expectedEnvfunc func() *environment.CommandEnvironment
 	}
 
 	testCases := []testCase{
 		{
 			"Empty original env and old _condor_SEC_CREDENTIAL_GETTOKEN_OPTS",
-			func() *environment.CommandEnvironment { return new(environment.CommandEnvironment) },
+			copyTestVaultStorerClient(baseV),
 			func() *environment.CommandEnvironment {
 				env := new(environment.CommandEnvironment)
-				env.SetCondorCreddHost(credd)
-				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("-a %s", vaultServer))
+				env.SetCondorCreddHost(baseV.credd)
+				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("-a %s", baseV.vaultServer))
 				return env
 			},
 		},
 		{
 			"Empty original env, filled old _condor_SEC_CREDENTIAL_GETTOKEN_OPTS",
+			func() *VaultStorerClient {
+				v := copyTestVaultStorerClient(baseV)
+				v.CommandEnvironment.SetCondorSecCredentialGettokenOpts("--foo bar")
+				return v
+			}(),
 			func() *environment.CommandEnvironment {
 				env := new(environment.CommandEnvironment)
-				env.SetCondorSecCredentialGettokenOpts("--foo bar")
-				return env
-			},
-			func() *environment.CommandEnvironment {
-				env := new(environment.CommandEnvironment)
-				env.SetCondorCreddHost(credd)
-				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("--foo bar -a %s", vaultServer))
+				env.SetCondorCreddHost(baseV.credd)
+				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("--foo bar -a %s", baseV.vaultServer))
 				return env
 			},
 		},
 		{
 			"Filled original env, empty old _condor_SEC_CREDENTIAL_GETTOKEN_OPTS",
+			func() *VaultStorerClient {
+				v := copyTestVaultStorerClient(baseV)
+				v.CommandEnvironment.SetKrb5ccname("blahblah", environment.FILE)
+				return v
+			}(),
 			func() *environment.CommandEnvironment {
 				env := new(environment.CommandEnvironment)
 				env.SetKrb5ccname("blahblah", environment.FILE)
-				return env
-			},
-			func() *environment.CommandEnvironment {
-				env := new(environment.CommandEnvironment)
-				env.SetKrb5ccname("blahblah", environment.FILE)
-				env.SetCondorCreddHost(credd)
-				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("-a %s", vaultServer))
+				env.SetCondorCreddHost(baseV.credd)
+				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("-a %s", baseV.vaultServer))
 				return env
 			},
 		},
 		{
 			"Filled original env, filled old _condor_SEC_CREDENTIAL_GETTOKEN_OPTS",
+			func() *VaultStorerClient {
+				v := copyTestVaultStorerClient(baseV)
+				v.CommandEnvironment.SetKrb5ccname("blahblah", environment.FILE)
+				v.CommandEnvironment.SetCondorSecCredentialGettokenOpts("--foo bar")
+				return v
+			}(),
 			func() *environment.CommandEnvironment {
 				env := new(environment.CommandEnvironment)
 				env.SetKrb5ccname("blahblah", environment.FILE)
-				env.SetCondorSecCredentialGettokenOpts("--foo bar")
-				return env
-			},
-			func() *environment.CommandEnvironment {
-				env := new(environment.CommandEnvironment)
-				env.SetKrb5ccname("blahblah", environment.FILE)
-				env.SetCondorCreddHost(credd)
-				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("--foo bar -a %s", vaultServer))
+				env.SetCondorCreddHost(baseV.credd)
+				env.SetCondorSecCredentialGettokenOpts(fmt.Sprintf("--foo bar -a %s", baseV.vaultServer))
 				return env
 			},
 		},
@@ -248,9 +311,8 @@ func TestSetupEnvironmentForTokenStorer(t *testing.T) {
 		t.Run(
 			test.description,
 			func(t *testing.T) {
-				oldEnv := test.oldEnvfunc()
 				expectedEnv := test.expectedEnvfunc()
-				if resultEnv := setupEnvironmentForTokenStorer(oldEnv, credd, vaultServer); *resultEnv != *expectedEnv {
+				if resultEnv := test.v.setupCmdEnvironment(); *resultEnv != *expectedEnv {
 					t.Errorf("Did not get expected environmnent.  Expected %s, got %s", expectedEnv.String(), resultEnv.String())
 				}
 			},
@@ -258,60 +320,82 @@ func TestSetupEnvironmentForTokenStorer(t *testing.T) {
 	}
 }
 
-func TestCheckStdOutForErrorAuthNeeded(t *testing.T) {
+func TestNewVaultStorerClient(t *testing.T) {
+	initialCredd := "credd1"
+	vaultServer := "vaultServer.host"
 	type testCase struct {
-		description          string
-		stdoutStderr         []byte
-		expectedErrTypeCheck error
-		expectedWrappedError error
+		description               string
+		initialCreddHost          string
+		inputCredd                string
+		expectedVaultStorerClient *VaultStorerClient
 	}
 
 	testCases := []testCase{
 		{
-			"Random string - should not find result",
-			[]byte("This is a random string"),
-			nil,
-			nil,
+			"Env credd matches input credd",
+			initialCredd,
+			initialCredd,
+			&VaultStorerClient{
+				credd:       initialCredd,
+				vaultServer: vaultServer,
+				CommandEnvironment: func() *environment.CommandEnvironment {
+					env := &environment.CommandEnvironment{}
+					env.SetCondorCreddHost(initialCredd)
+					return env
+				}(),
+			},
 		},
 		{
-			"Auth needed",
-			[]byte("Authentication needed for myservice"),
-			&ErrAuthNeeded{},
-			nil,
+			"Env credd differs from input credd",
+			initialCredd,
+			"credd2",
+			&VaultStorerClient{
+				credd:       "credd2",
+				vaultServer: vaultServer,
+				CommandEnvironment: func() *environment.CommandEnvironment {
+					env := &environment.CommandEnvironment{}
+					env.SetCondorCreddHost("credd2")
+					return env
+				}(),
+			},
 		},
 		{
-			"Auth needed - timeout",
-			[]byte("Authentication needed for myservice\n\n\nblahblah\n\nhtgettoken: Polling for response took longer than 2 minutes"),
-			&ErrAuthNeeded{},
-			errHtgettokenTimeout,
-		},
-		{
-			"Auth needed - permission denied",
-			[]byte("Authentication needed for myservice\n\n\nblahblah\n\nhtgettoken: blahblah HTTP Error 403: Forbidden: permission denied"),
-			&ErrAuthNeeded{},
-			errHtgettokenPermissionDenied,
+			"Env credd is empty, input credd is set",
+			"",
+			"credd3",
+			&VaultStorerClient{
+				credd:       "credd3",
+				vaultServer: vaultServer,
+				CommandEnvironment: func() *environment.CommandEnvironment {
+					env := &environment.CommandEnvironment{}
+					env.SetCondorCreddHost("credd3")
+					return env
+				}(),
+			},
 		},
 	}
 
 	for _, test := range testCases {
-		t.Run(
-			test.description,
-			func(t *testing.T) {
-				err := checkStdoutStderrForAuthNeededError(test.stdoutStderr)
-				if err == nil && test.expectedErrTypeCheck == nil {
-					return
-				}
-				var err1 *ErrAuthNeeded
-				if !errors.As(err, &err1) {
-					t.Errorf("Expected returned error to be of type *errAuthNeeded.  Got %T instead", err)
-					return
-				}
+		t.Run(test.description, func(t *testing.T) {
+			origEnv := &environment.CommandEnvironment{}
+			if test.initialCreddHost != "" {
+				origEnv.SetCondorCreddHost(test.initialCreddHost)
+			}
+			client := NewVaultStorerClient(test.inputCredd, vaultServer, origEnv)
+			if ((client).credd != (test.expectedVaultStorerClient).credd) ||
+				((client).vaultServer != (test.expectedVaultStorerClient).vaultServer) ||
+				((client).verbose != (test.expectedVaultStorerClient).verbose) ||
+				(*((client).CommandEnvironment)) != *(test.expectedVaultStorerClient.CommandEnvironment) {
+				t.Errorf("Expected VaultStorerClient %v, got %v", test.expectedVaultStorerClient, client)
+			}
+		})
+	}
+}
 
-				if errVal := errors.Unwrap(err); !errors.Is(errVal, test.expectedWrappedError) {
-					t.Errorf("Did not get expected wrapped error.  Expected error %v to be wrapped, but full error is %v.", test.expectedWrappedError, err)
-				}
-
-			},
-		)
+func copyTestVaultStorerClient(v *VaultStorerClient) *VaultStorerClient {
+	return &VaultStorerClient{
+		credd:              v.credd,
+		vaultServer:        v.vaultServer,
+		CommandEnvironment: v.CommandEnvironment.Copy(),
 	}
 }

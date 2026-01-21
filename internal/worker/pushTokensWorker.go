@@ -41,6 +41,7 @@ import (
 	"github.com/fermitools/managed-tokens/internal/notifications"
 	"github.com/fermitools/managed-tokens/internal/service"
 	"github.com/fermitools/managed-tokens/internal/tracing"
+	"github.com/fermitools/managed-tokens/internal/vaultToken"
 )
 
 // Sleep time between each retry
@@ -111,10 +112,10 @@ func (v *pushTokenSuccess) GetSuccess() bool {
 	return v.success
 }
 
-// PushTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
+// pushTokenWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // pushes vault tokens to all the configured destination nodes.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
-func PushTokensWorker(ctx context.Context, chans channelGroup) {
+func pushTokensWorker(ctx context.Context, chans channelGroup) {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.PushTokensWorker")
 	defer span.End()
 
@@ -443,22 +444,25 @@ func prepareDefaultRoleFile(sc *Config) (string, error) {
 
 // findFirstCreddVaultToken will cycle through the credds slice in an order determined by slices.Sort() and attempt to find a stored vault token for
 // a credd at the tokenRootPath.  If this fails, it will return the location used by condor_vault_storer to store tokens
+// If the vault token was not stored in a credd, give nil as the value of credds.  Giving {}string[] will cause findFirstCreddVaultToken to return an error
 func findFirstCreddVaultToken(tokenRootPath, serviceName string, credds []string) (string, error) {
 	funcLogger := log.WithField("service", serviceName)
 
-	if len(credds) == 0 {
+	if len(credds) == 0 && credds != nil {
 		return "", errors.New("no credds given")
 	}
 
 	creddsSorted := make([]string, len(credds))
-	copy(creddsSorted, credds)
-	slices.Sort(creddsSorted)
+	if credds == nil {
+		creddsSorted = append(creddsSorted, "")
+	} else {
+		copy(creddsSorted, credds)
+		slices.Sort(creddsSorted)
+	}
 
 	// Check each possible credd path for the token file.  If we find one, use it
-	for i := 0; i < len(creddsSorted); i++ {
-		trialCredd := creddsSorted[i]
+	for _, trialCredd := range creddsSorted {
 		trialPath := getServiceTokenForCreddLocation(tokenRootPath, serviceName, trialCredd)
-
 		if _, err := os.Stat(trialPath); err == nil {
 			funcLogger.WithFields(log.Fields{
 				"credd":     trialCredd,
@@ -469,7 +473,7 @@ func findFirstCreddVaultToken(tokenRootPath, serviceName string, credds []string
 	}
 
 	// We didn't find a usable vault token at the tokenRootPath, so try /tmp for a condor vault token
-	trialPath := getCondorVaultTokenLocation(serviceName)
+	trialPath := vaultToken.GetCondorVaultTokenLocation(serviceName)
 	if _, err := os.Stat(trialPath); err == nil {
 		funcLogger.WithFields(log.Fields{
 			"tokenPath": trialPath,
@@ -526,14 +530,25 @@ func getPushTokensValuesFromConfig(c *Config) ([]pushTokensConfig, error) {
 	}
 	sendDefaultRoleFile := !dontSendDefaultRoleFile
 
+	var numRetries uint
+	var retrySleepDuration time.Duration
 	// Retry values
-	numRetries, err := getWorkerNumRetriesValueFromConfig(*c, PushTokensWorkerType)
-	if err != nil {
+	numRetries, err = getWorkerNumRetriesValueFromConfig(*c, PushTokens)
+	switch {
+	case errors.Is(err, errNoWorkerTypeMapInConfig):
+		log.Debug("No retry configuration found for PushTokens worker type.  Using default values")
+		numRetries = 0
+	case err != nil:
 		log.Debug("Could not get retry value from config.  Using default value")
 		numRetries = 0
 	}
-	retrySleepDuration, err := getWorkerRetrySleepValueFromConfig(*c, PushTokensWorkerType)
-	if err != nil {
+
+	retrySleepDuration, err = getWorkerRetrySleepValueFromConfig(*c, PushTokens)
+	switch {
+	case errors.Is(err, errNoWorkerTypeMapInConfig):
+		log.Debug("No retry configuration found for PushTokens worker type.  Using default values")
+		retrySleepDuration = defaultRetrySleepDuration
+	case err != nil:
 		log.Debug("Could not get retry sleep value from config.  Using default value")
 		retrySleepDuration = defaultRetrySleepDuration
 	}

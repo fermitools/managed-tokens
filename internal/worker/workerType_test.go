@@ -27,27 +27,23 @@ func TestWorkerTypeString(t *testing.T) {
 		expected   string
 	}{
 		{
-			workerType: GetKerberosTicketsWorkerType,
+			workerType: GetKerberosTickets,
 			expected:   "GetKerberosTickets",
 		},
 		{
-			workerType: StoreAndGetTokenWorkerType,
+			workerType: StoreAndGetToken,
 			expected:   "StoreAndGetToken",
 		},
 		{
-			workerType: StoreAndGetTokenInteractiveWorkerType,
-			expected:   "StoreAndGetTokenInteractive",
-		},
-		{
-			workerType: PingAggregatorWorkerType,
+			workerType: PingAggregator,
 			expected:   "PingAggregator",
 		},
 		{
-			workerType: PushTokensWorkerType,
+			workerType: PushTokens,
 			expected:   "PushTokens",
 		},
 		{
-			workerType: invalidWorkerType, // UnknownWorkerType
+			workerType: invalid, // UnknownWorkerType
 			expected:   "Unknown",
 		},
 	}
@@ -63,31 +59,27 @@ func TestIsValidWorkerType(t *testing.T) {
 		expected   bool
 	}{
 		{
-			workerType: GetKerberosTicketsWorkerType,
+			workerType: GetKerberosTickets,
 			expected:   true,
 		},
 		{
-			workerType: StoreAndGetTokenWorkerType,
+			workerType: StoreAndGetToken,
 			expected:   true,
 		},
 		{
-			workerType: StoreAndGetTokenInteractiveWorkerType,
+			workerType: PingAggregator,
 			expected:   true,
 		},
 		{
-			workerType: PingAggregatorWorkerType,
+			workerType: PushTokens,
 			expected:   true,
 		},
 		{
-			workerType: PushTokensWorkerType,
-			expected:   true,
-		},
-		{
-			workerType: invalidWorkerType,
+			workerType: invalid,
 			expected:   false,
 		},
 		{
-			workerType: invalidWorkerType + 1, // UnknownWorkerType
+			workerType: invalid + 1, // UnknownWorkerType
 			expected:   false,
 		},
 	}

@@ -19,6 +19,7 @@ package worker
 // in the Config.Extras map should use a SupportedExtrasKey as the key
 type supportedExtrasKey int
 
+// TODO Given that all of these are actually only applicable to the PushTokens workerType, maybe we make these WorkerSpecificConfigOptions instead?
 const (
 	// DefaultRoleFileTemplate is a key to store the value of the default role file template in the Config.Extras map
 	DefaultRoleFileDestinationTemplate supportedExtrasKey = iota

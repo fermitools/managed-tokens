@@ -27,7 +27,7 @@ import (
 
 func TestGetWorkerConfigStringSlice(t *testing.T) {
 	viper.Reset()
-	workerType := worker.GetKerberosTicketsWorkerType
+	workerType := worker.GetKerberosTickets
 	key := "myKey"
 	expectedValue := []string{"value1", "value2"}
 
@@ -42,7 +42,7 @@ func TestGetWorkerConfigStringSlice(t *testing.T) {
 }
 
 func TestGetWorkerConfigInteger(t *testing.T) {
-	workerType := worker.GetKerberosTicketsWorkerType
+	workerType := worker.GetKerberosTickets
 	key := "myKey"
 
 	type testCase struct {
@@ -102,7 +102,7 @@ func TestGetWorkerConfigInteger(t *testing.T) {
 
 func TestGetWorkerConfigString(t *testing.T) {
 	viper.Reset()
-	workerType := worker.GetKerberosTicketsWorkerType
+	workerType := worker.GetKerberosTickets
 	key := "myKey"
 	expectedValue := "myValue"
 
@@ -129,7 +129,7 @@ func TestGetWorkerConfigValue(t *testing.T) {
 		expected any
 	}{
 		{
-			WorkerType: worker.GetKerberosTicketsWorkerType,
+			WorkerType: worker.GetKerberosTickets,
 			key:        "key1",
 			config: map[string]any{
 				"workerType.getKerberosTickets.key1": "value1",
@@ -137,7 +137,7 @@ func TestGetWorkerConfigValue(t *testing.T) {
 			expected: "value1",
 		},
 		{
-			WorkerType: worker.GetKerberosTicketsWorkerType,
+			WorkerType: worker.GetKerberosTickets,
 			key:        "key2",
 			config: map[string]any{
 				"workerType.getKerberosTickets.key2": 42,
@@ -145,7 +145,7 @@ func TestGetWorkerConfigValue(t *testing.T) {
 			expected: 42,
 		},
 		{
-			WorkerType: worker.GetKerberosTicketsWorkerType,
+			WorkerType: worker.GetKerberosTickets,
 			key:        "key3",
 			config: map[string]any{
 				"workerType.getKerberosTickets.key3": []string{"value1", "value2"},
@@ -153,7 +153,7 @@ func TestGetWorkerConfigValue(t *testing.T) {
 			expected: []string{"value1", "value2"},
 		},
 		{
-			WorkerType: worker.GetKerberosTicketsWorkerType,
+			WorkerType: worker.GetKerberosTickets,
 			key:        "key4",
 			config:     map[string]any{},
 			expected:   nil,
@@ -179,7 +179,7 @@ func TestGetWorkerConfigValue(t *testing.T) {
 }
 
 func TestGetWorkerConfigTimeDuration(t *testing.T) {
-	workerType := worker.GetKerberosTicketsWorkerType
+	workerType := worker.GetKerberosTickets
 	key := "myKey"
 
 	type testCase struct {
@@ -225,23 +225,23 @@ func TestWorkerTypeToConfigString(t *testing.T) {
 		expected   string
 	}{
 		{
-			workerType: worker.GetKerberosTicketsWorkerType,
+			workerType: worker.GetKerberosTickets,
 			expected:   "getKerberosTickets",
 		},
 		{
-			workerType: worker.StoreAndGetTokenWorkerType,
+			workerType: worker.GetToken,
+			expected:   "getToken",
+		},
+		{
+			workerType: worker.StoreAndGetToken,
 			expected:   "storeAndGetToken",
 		},
 		{
-			workerType: worker.StoreAndGetTokenInteractiveWorkerType,
-			expected:   "storeAndGetTokenInteractive",
-		},
-		{
-			workerType: worker.PingAggregatorWorkerType,
+			workerType: worker.PingAggregator,
 			expected:   "pingAggregator",
 		},
 		{
-			workerType: worker.PushTokensWorkerType,
+			workerType: worker.PushTokens,
 			expected:   "pushTokens",
 		},
 	}
@@ -250,6 +250,78 @@ func TestWorkerTypeToConfigString(t *testing.T) {
 		t.Run(fmt.Sprintf("WorkerType: %s", test.workerType.String()), func(t *testing.T) {
 			result := workerTypeToConfigString(test.workerType)
 			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestWorkerTypeFromConfig(t *testing.T) {
+	tests := []struct {
+		description string
+		input       string
+		expectedWT  worker.WorkerType
+		expectedOk  bool
+	}{
+		{
+			description: "Valid config string for GetKerberosTickets",
+			input:       "getKerberosTickets",
+			expectedWT:  worker.GetKerberosTickets,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for GetToken",
+			input:       "getToken",
+			expectedWT:  worker.GetToken,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for StoreAndGetToken",
+			input:       "storeAndGetToken",
+			expectedWT:  worker.StoreAndGetToken,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for PingAggregator",
+			input:       "pingAggregator",
+			expectedWT:  worker.PingAggregator,
+			expectedOk:  true,
+		},
+		{
+			description: "Valid config string for PushTokens",
+			input:       "pushTokens",
+			expectedWT:  worker.PushTokens,
+			expectedOk:  true,
+		},
+		{
+			description: "Invalid config string",
+			input:       "invalid",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+		{
+			description: "Empty string",
+			input:       "",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+		{
+			description: "Wrong case",
+			input:       "GetKerberosTickets",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+		{
+			description: "Gibberish string",
+			input:       "asdlkjasdklj",
+			expectedWT:  0,
+			expectedOk:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			wt, ok := workerTypeFromConfig(tc.input)
+			assert.Equal(t, tc.expectedWT, wt)
+			assert.Equal(t, tc.expectedOk, ok)
 		})
 	}
 }

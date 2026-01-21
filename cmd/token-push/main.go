@@ -338,8 +338,10 @@ func run(ctx context.Context) error {
 	// Concurrently collect service configs, and after collection is done, signal to run() that it
 	// can proceed with processing
 	serviceConfigs := make(map[string]*worker.Config) // Running map of service configs to pass to workers
+	onlyGetTokenServices := make(map[string]struct{}) // Services that only need us to get token (no storing)
 	// Since our worker configs are getting set up concurrently, protect our service maps with these mutexes
 	var _serviceConfigsMux sync.Mutex
+	var _onlyGetTokenServicesMux sync.Mutex
 	var _successfulServicesMux sync.Mutex
 
 	// Set up our serviceConfigs and load them into various collection channels
@@ -390,10 +392,36 @@ func run(ctx context.Context) error {
 				tracing.LogErrorWithTrace(span, funcLogger, "Cannot proceed without vault server. Returning now.")
 				return
 			}
-			collectorHost, schedds, err := getScheddsAndCollectorHostFromConfiguration(ctx, serviceConfigPath)
-			if err != nil {
-				tracing.LogErrorWithTrace(span, funcLogger, "Cannot proceed without schedds. Returning now")
-				return
+
+			// If we only have to get a token for this service, add that service to the onlyGetTokenServices map
+			// and set the schedds variable to a nil slice (with a warning).
+			var collectorHost string
+			var schedds []string
+			tokenGetterWT := getTokenGetterOverrideFromConfiguration(serviceConfigPath)
+			switch tokenGetterWT {
+			case worker.GetToken:
+				_onlyGetTokenServicesMux.Lock()
+				onlyGetTokenServices[getServiceName(s)] = struct{}{}
+				_onlyGetTokenServicesMux.Unlock()
+
+				funcLogger.Info("Service configured to only get vault token. schedds list for this service will be nil")
+				schedds = nil
+			case worker.StoreAndGetToken:
+				collectorHost, schedds, err = getScheddsAndCollectorHostFromConfiguration(ctx, serviceConfigPath)
+				if err != nil {
+					tracing.LogErrorWithTrace(span, funcLogger, "Cannot proceed without schedds. Returning now")
+					return
+				}
+			}
+
+			// Determine if we need to have our token-obtaining worker run interactively for the service config.
+			// This will be a no-op if either there is no tokenGetter override in the configuration (default),
+			// or if we are not running onboarding.  For any worker type in worker.ValidTokenGetterWorkerTypes,
+			// if we're running onboarding, then set the interactive bool in the worker.Config
+			tokenGetterInteractiveSelector := worker.ConfigOption(func(*worker.Config) error { return nil })
+			if viper.GetBool("run-onboarding") {
+				funcLogger.Debug("Running onboarding; setting token getter to interactive mode")
+				tokenGetterInteractiveSelector = worker.SetInteractiveTokenGetterOption(tokenGetterWT, true)
 			}
 
 			// Service-level configuration items that can be defined either in configuration file or on system/environment or have library defaults
@@ -424,6 +452,7 @@ func run(ctx context.Context) error {
 				worker.SetSupportedExtrasKeyValue(worker.FileCopierOptions, fileCopierOptions),
 				worker.SetSupportedExtrasKeyValue(worker.PingOptions, extraPingOpts),
 				worker.SetSupportedExtrasKeyValue(worker.SSHOptions, sshOpts),
+				tokenGetterInteractiveSelector,
 			)
 			if err != nil {
 				tracing.LogErrorWithTrace(span, funcLogger, "Could not create config for service")
@@ -483,7 +512,7 @@ func run(ctx context.Context) error {
 	// Get channels and start worker for getting kerberos ticekts
 	startKerberos := time.Now()
 	span.AddEvent("Starting get kerberos tickets")
-	kerberosChannels := startServiceConfigWorkerForProcessing(ctx, worker.GetKerberosTicketsWorker, serviceConfigs, timeoutKerberos)
+	kerberosChannels := startServiceConfigWorkerForProcessing(ctx, worker.GetKerberosTickets, serviceConfigs, timeoutKerberos)
 
 	// If we couldn't get a kerberos ticket for a service, we don't want to try to get vault
 	// tokens for that service
@@ -501,37 +530,63 @@ func run(ctx context.Context) error {
 	span.AddEvent("End get kerberos tickets")
 
 	// 2. Get and store vault tokens
-	// Get channels and start worker for getting and storing short-lived vault token (condor_vault_storer)
-	startCondorVault := time.Now()
-	span.AddEvent("Start obtain and store vault tokens")
+	// We're enclosing this in a func() so that the garbage collector can try to clean up the extra maps we'll have to make here
+	func() {
+		_serviceConfigsGetToken := make(map[string]*worker.Config)
+		_serviceConfigsStoreAndGetToken := make(map[string]*worker.Config)
 
-	var w worker.Worker
-	w = worker.StoreAndGetTokenWorker
-	if viper.GetBool("run-onboarding") {
-		w = worker.StoreAndGetTokenInteractiveWorker
-	}
-	condorVaultChans := startServiceConfigWorkerForProcessing(ctx, w, serviceConfigs, timeoutVaultStorer)
-
-	// Wait until all workers are done, remove any service configs that we couldn't get tokens for from Configs,
-	// and then begin transferring to nodes
-	failedVaultConfigs := removeFailedServiceConfigs(condorVaultChans, serviceConfigs)
-	for _, failure := range failedVaultConfigs {
-		exeLogger.WithField("service", failure.Service.Name()).Error("Failed to obtain vault token.  Will not try to push vault token to service nodes")
-	}
-
-	// For any successful services, make sure we remove all the vault tokens when we're done
-	for serviceName := range serviceConfigs {
-		defer func(serviceName string) {
-			if err := vaultToken.RemoveServiceVaultTokens(serviceName); err != nil {
-				exeLogger.WithField("service", serviceName).Error("Could not remove vault tokens for service")
+		// Pick which serviceConfigs are going to use a worker.GetTokenWorker vs worker.StoreAndGetTokenWorker
+		for serviceName := range serviceConfigs {
+			if _, ok := onlyGetTokenServices[serviceName]; ok {
+				_serviceConfigsGetToken[serviceName] = serviceConfigs[serviceName]
+				continue
 			}
-		}(serviceName)
-	}
+			_serviceConfigsStoreAndGetToken[serviceName] = serviceConfigs[serviceName]
+		}
 
-	if prometheusUp {
-		promDuration.WithLabelValues(currentExecutable, "storeAndGetTokens").Set(time.Since(startCondorVault).Seconds())
-	}
-	span.AddEvent("End obtain and store vault tokens")
+		// 2a.  Handle serviceConfigs that only need to get tokens
+		startGetTokens := time.Now()
+		span.AddEvent("Start get tokens for services that only need to get tokens")
+		getTokenChans := startServiceConfigWorkerForProcessing(ctx, worker.GetToken, _serviceConfigsGetToken, timeoutVaultStorer)
+
+		// Wait until all workers are done, remove any service configs that we couldn't get tokens for from serviceConfigs.
+		failedGetTokenConfigs := removeFailedServiceConfigs(getTokenChans, serviceConfigs)
+		for _, failure := range failedGetTokenConfigs {
+			exeLogger.WithField("service", failure.Service.Name()).Error("Failed to obtain vault token.  Will not try to push vault token to service nodes")
+		}
+
+		if prometheusUp {
+			promDuration.WithLabelValues(currentExecutable, "getTokens").Set(time.Since(startGetTokens).Seconds())
+		}
+		span.AddEvent("End get tokens for services that only need to get tokens")
+
+		// 2b. Get channels and start worker for getting and storing short-lived vault token (condor_vault_storer)
+		startCondorVault := time.Now()
+		span.AddEvent("Start obtain and store vault tokens")
+
+		// Get channels and start worker for getting and storing vault tokens
+		condorVaultChans := startServiceConfigWorkerForProcessing(ctx, worker.StoreAndGetToken, _serviceConfigsStoreAndGetToken, timeoutVaultStorer)
+
+		// Wait until all workers are done, remove any service configs that we couldn't get tokens for from serviceConfigs
+		failedVaultConfigs := removeFailedServiceConfigs(condorVaultChans, serviceConfigs)
+		for _, failure := range failedVaultConfigs {
+			exeLogger.WithField("service", failure.Service.Name()).Error("Failed to obtain vault token.  Will not try to push vault token to service nodes")
+		}
+
+		// For any successful services, make sure we remove all the vault tokens when we're done
+		for serviceName := range serviceConfigs {
+			defer func(serviceName string) {
+				if err := vaultToken.RemoveServiceVaultTokens(serviceName); err != nil {
+					exeLogger.WithField("service", serviceName).Error("Could not remove vault tokens for service")
+				}
+			}(serviceName)
+		}
+
+		if prometheusUp {
+			promDuration.WithLabelValues(currentExecutable, "storeAndGetTokens").Set(time.Since(startCondorVault).Seconds())
+		}
+		span.AddEvent("End obtain and store vault tokens")
+	}()
 
 	// If we're in test mode, stop here
 	if viper.GetBool("test") {
@@ -560,7 +615,7 @@ func run(ctx context.Context) error {
 	// Get channels and start worker for pinging service nodes
 	startPing := time.Now()
 	span.AddEvent("Start ping nodes")
-	pingChans := startServiceConfigWorkerForProcessing(ctx, worker.PingAggregatorWorker, serviceConfigs, timeoutPing)
+	pingChans := startServiceConfigWorkerForProcessing(ctx, worker.PingAggregator, serviceConfigs, timeoutPing)
 
 	for pingSuccess := range pingChans.GetSuccessChan() {
 		if !pingSuccess.GetSuccess() {
@@ -578,7 +633,7 @@ func run(ctx context.Context) error {
 	// Get channels and start worker for pushing tokens to service nodes
 	startPush := time.Now()
 	span.AddEvent("Start push tokens")
-	pushChans := startServiceConfigWorkerForProcessing(ctx, worker.PushTokensWorker, serviceConfigs, timeoutPush)
+	pushChans := startServiceConfigWorkerForProcessing(ctx, worker.PushTokens, serviceConfigs, timeoutPush)
 
 	// Aggregate the successes
 	for pushSuccess := range pushChans.GetSuccessChan() {

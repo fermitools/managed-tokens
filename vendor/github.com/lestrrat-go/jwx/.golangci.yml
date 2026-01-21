@@ -10,10 +10,13 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+    - contextcheck
     - cyclop
+    - depguard
     - dupl
     - exhaustive
-    - exhaustivestruct
+    - exhaustruct
+    - err113
     - errorlint
     - funlen
     - gci
@@ -24,25 +27,26 @@ linters:
     - gocyclo
     - godot
     - godox
-    - goerr113
     - gofumpt
-    - golint #deprecated
     - gomnd
     - gomoddirectives # I think it's broken
     - gosec
+    - gosmopolitan
     - govet
-    - interfacer # deprecated
-    - ifshort
+    - inamedparam # oh, sod off
+    - interfacebloat 
     - ireturn # No, I _LIKE_ returning interfaces
     - lll
     - maintidx # Do this in code review
-    - maligned # deprecated
     - makezero
+    - mnd # TODO: re-enable when we can check again
+    - nonamedreturns
     - nakedret
     - nestif
     - nlreturn
     - paralleltest
-    - scopelint # deprecated
+    - perfsprint
+    - testifylint # TODO: re-enable when we can check again
     - tagliatelle
     - testpackage
     - thelper    # Tests are fine
@@ -83,6 +87,10 @@ issues:
     - path: cmd/jwx/jwx.go
       linters:
         - forbidigo
+    - path: /*_test.go
+      text: "var-naming: "
+      linters:
+        - revive
 
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
   max-issues-per-linter: 0

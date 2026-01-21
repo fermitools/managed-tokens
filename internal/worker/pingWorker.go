@@ -79,10 +79,10 @@ func (p *pingSuccess) GetSuccess() bool {
 	return p.success
 }
 
-// PingAggregatorWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
+// pingAggregatorWorker is a worker that listens on chans.GetServiceConfigChan(), and for the received worker.Config objects,
 // concurrently pings all of the Config's destination nodes.  It returns when chans.GetServiceConfigChan() is closed,
 // and it will in turn close the other chans in the passed in ChannelsForWorkers
-func PingAggregatorWorker(ctx context.Context, chans channelGroup) {
+func pingAggregatorWorker(ctx context.Context, chans channelGroup) {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.PingAggregatorWorker")
 	defer span.End()
 

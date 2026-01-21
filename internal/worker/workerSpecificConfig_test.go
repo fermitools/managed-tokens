@@ -24,26 +24,70 @@ import (
 )
 
 func TestGetWorkerRetryValueFromConfig(t *testing.T) {
-	c := &Config{}
-	c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType] = make(map[WorkerSpecificConfigOption]any, 0)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][NumRetriesOption] = uint(5)
+	t.Run("Valid case", func(t *testing.T) {
+		c := &Config{}
+		c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+		c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+		c.workerSpecificConfig[PushTokens][NumRetriesOption] = uint(5)
+		val, err := getWorkerNumRetriesValueFromConfig(*c, PushTokens)
+		assert.Nil(t, err)
+		assert.Equal(t, uint(5), val)
+	})
 
-	// Test case: Worker type exists in the config
-	val, err := getWorkerNumRetriesValueFromConfig(*c, GetKerberosTicketsWorkerType)
-	assert.Nil(t, err)
-	assert.Equal(t, uint(5), val)
+	// Specific error cases
+	type testCase struct {
+		description    string
+		setupFunc      func(c *Config)
+		testWorkerType WorkerType
+		errContains    string
+	}
 
-	// Test case: Worker type does not exist in the config
-	val, err = getWorkerNumRetriesValueFromConfig(*c, PushTokensWorkerType)
-	assert.NotNil(t, err)
-	assert.Equal(t, uint(0), val)
+	testCases := []testCase{
+		{
+			description:    "Empty config",
+			setupFunc:      func(c *Config) {},
+			testWorkerType: PushTokens,
+			errContains:    "no WorkerType PushTokens map found in Config",
+		},
+		{
+			description: "Worker type does not exist in the config",
+			setupFunc: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+			},
+			testWorkerType: PushTokens,
+			errContains:    "no NumRetriesOption found for workerType",
+		},
+		{
+			description: "Worker type is invalid",
+			setupFunc: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+			},
+			testWorkerType: WorkerType(invalid),
+			errContains:    "invalid worker type",
+		},
+		{
+			description: "Value is not of type time.Duration",
+			setupFunc: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+				c.workerSpecificConfig[PushTokens][NumRetriesOption] = "invalid"
+			},
+			testWorkerType: PushTokens,
+			errContains:    "is not of type uint",
+		},
+	}
 
-	// Test case: Worker type exists in the config but value is not of type uint
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][NumRetriesOption] = "invalid"
-	val, err = getWorkerNumRetriesValueFromConfig(*c, GetKerberosTicketsWorkerType)
-	assert.NotNil(t, err)
-	assert.Equal(t, uint(0), val)
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			c := &Config{}
+			tc.setupFunc(c)
+			val, err := getWorkerNumRetriesValueFromConfig(*c, tc.testWorkerType)
+			assert.ErrorContains(t, err, tc.errContains)
+			assert.Equal(t, uint(0), val)
+		})
+	}
 }
 func TestIsValidWorkerSpecificConfigOption(t *testing.T) {
 	// Test case: Valid worker specific config option
@@ -51,31 +95,76 @@ func TestIsValidWorkerSpecificConfigOption(t *testing.T) {
 	assert.True(t, validOption)
 
 	// Test case: Invalid worker specific config option
-	invalidOption := isValidWorkerSpecificConfigOption(WorkerSpecificConfigOption(2))
+	invalidOption := isValidWorkerSpecificConfigOption(WorkerSpecificConfigOption(invalidWorkerSpecificConfigOption))
 	assert.False(t, invalidOption)
 }
 
 func TestGetWorkerRetrySleepValueFromConfig(t *testing.T) {
-	c := &Config{}
-	c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType] = make(map[WorkerSpecificConfigOption]any, 0)
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][RetrySleepOption] = 5 * time.Second
+	t.Run("Valid case", func(t *testing.T) {
+		c := &Config{}
+		c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+		c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+		c.workerSpecificConfig[PushTokens][RetrySleepOption] = 5 * time.Second
+		val, err := getWorkerRetrySleepValueFromConfig(*c, PushTokens)
+		assert.Nil(t, err)
+		assert.Equal(t, 5*time.Second, val)
+	})
 
-	// Test case: Worker type exists in the config
-	val, err := getWorkerRetrySleepValueFromConfig(*c, GetKerberosTicketsWorkerType)
-	assert.Nil(t, err)
-	assert.Equal(t, 5*time.Second, val)
+	// Specific error cases
+	type testCase struct {
+		description    string
+		setupFunc      func(c *Config)
+		testWorkerType WorkerType
+		errContains    string
+	}
 
-	// Test case: Worker type does not exist in the config
-	val, err = getWorkerRetrySleepValueFromConfig(*c, PushTokensWorkerType)
-	assert.NotNil(t, err)
-	assert.Equal(t, time.Duration(0), val)
+	testCases := []testCase{
+		{
+			description:    "Empty config",
+			setupFunc:      func(c *Config) {},
+			testWorkerType: PushTokens,
+			errContains:    "no WorkerType PushTokens map found in Config",
+		},
+		{
+			description: "Worker type does not exist in the config",
+			setupFunc: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+			},
+			testWorkerType: PushTokens,
+			errContains:    "no RetrySleepOption found for workerType",
+		},
+		{
+			description: "Worker type is invalid",
+			setupFunc: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+			},
+			testWorkerType: WorkerType(invalid),
+			errContains:    "invalid worker type",
+		},
+		{
+			description: "Value is not of type time.Duration",
+			setupFunc: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
+				c.workerSpecificConfig[PushTokens][RetrySleepOption] = "invalid"
+			},
+			testWorkerType: PushTokens,
+			errContains:    "is not of type time.Duration",
+		},
+	}
 
-	// Test case: Worker type exists in the config but value is not of type time.Duration
-	c.workerSpecificConfig[GetKerberosTicketsWorkerType][RetrySleepOption] = "invalid"
-	val, err = getWorkerRetrySleepValueFromConfig(*c, GetKerberosTicketsWorkerType)
-	assert.NotNil(t, err)
-	assert.Equal(t, time.Duration(0), val)
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			c := &Config{}
+			tc.setupFunc(c)
+			val, err := getWorkerRetrySleepValueFromConfig(*c, tc.testWorkerType)
+			assert.ErrorContains(t, err, tc.errContains)
+			assert.Equal(t, time.Duration(0), val)
+		})
+	}
+
 }
 
 func TestSetWorkerSpecificConfigOption(t *testing.T) {
@@ -91,12 +180,12 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 	testCases := []testCase{
 		{
 			description: "Set NumRetries option",
-			workerType:  GetKerberosTicketsWorkerType,
+			workerType:  GetKerberosTickets,
 			option:      NumRetriesOption,
 			value:       5,
 			expectedConfig: &Config{
 				workerSpecificConfig: map[WorkerType]map[WorkerSpecificConfigOption]any{
-					GetKerberosTicketsWorkerType: {
+					GetKerberosTickets: {
 						NumRetriesOption: 5,
 					},
 				},
@@ -105,12 +194,12 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		},
 		{
 			description: "Set RetrySleep option",
-			workerType:  GetKerberosTicketsWorkerType,
+			workerType:  GetKerberosTickets,
 			option:      RetrySleepOption,
 			value:       5 * time.Second,
 			expectedConfig: &Config{
 				workerSpecificConfig: map[WorkerType]map[WorkerSpecificConfigOption]any{
-					GetKerberosTicketsWorkerType: {
+					GetKerberosTickets: {
 						RetrySleepOption: 5 * time.Second,
 					},
 				},
@@ -119,7 +208,7 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		},
 		{
 			description:    "Invalid worker type",
-			workerType:     invalidWorkerType,
+			workerType:     invalid,
 			option:         NumRetriesOption,
 			value:          5,
 			expectedConfig: nil,
@@ -127,7 +216,7 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 		},
 		{
 			description:    "Invalid worker specific config option",
-			workerType:     GetKerberosTicketsWorkerType,
+			workerType:     GetKerberosTickets,
 			option:         invalidWorkerSpecificConfigOption,
 			value:          5,
 			expectedConfig: nil,
@@ -147,6 +236,98 @@ func TestSetWorkerSpecificConfigOption(t *testing.T) {
 			}
 			// Non-nil error, so make sure our error message is correct
 			assert.ErrorContains(t, err, tc.expectedErr.Error())
+		})
+	}
+}
+
+func TestGetWorkerTypeMapFromConfig(t *testing.T) {
+	// Good config
+	c := &Config{}
+	c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+	c.workerSpecificConfig[GetKerberosTickets] = make(map[WorkerSpecificConfigOption]any, 0)
+	c.workerSpecificConfig[GetKerberosTickets][NumRetriesOption] = uint(5)
+
+	validWorkerTypeList := []WorkerType{GetKerberosTickets, GetToken}
+
+	// Specific error cases
+	type testCase1 struct {
+		description string
+		config      Config
+		workerType  WorkerType
+		expectedErr error
+	}
+
+	testCases := []testCase1{
+		{
+			description: "Worker type not set in config",
+			config:      *c,
+			workerType:  GetToken,
+			expectedErr: errNoWorkerTypeMapInConfig,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			m, err := getWorkerTypeMapFromConfig(tc.config, tc.workerType, validWorkerTypeList)
+			assert.ErrorIs(t, err, tc.expectedErr)
+			assert.Nil(t, m)
+		})
+	}
+
+	// Test cases with non-specific errors
+
+	w := GetKerberosTickets
+	type testCase2 struct {
+		description         string
+		workerType          WorkerType
+		validWorkerTypes    []WorkerType
+		expected            map[WorkerSpecificConfigOption]any
+		expectedErrNil      bool
+		expectedErrContains string
+	}
+
+	testCases2 := []testCase2{
+		{
+			description:      "Valid case",
+			workerType:       w,
+			validWorkerTypes: validWorkerTypeList,
+			expected:         c.workerSpecificConfig[w],
+			expectedErrNil:   true,
+		},
+		{
+			description:      "Valid case - no restrictions on worker types",
+			workerType:       w,
+			validWorkerTypes: nil,
+			expected:         c.workerSpecificConfig[w],
+			expectedErrNil:   true,
+		},
+		{
+			description:         "Invalid worker type",
+			workerType:          WorkerType(255),
+			validWorkerTypes:    nil,
+			expected:            nil,
+			expectedErrNil:      false,
+			expectedErrContains: "invalid worker type",
+		},
+		{
+			description:         "Worker type not in valid list",
+			workerType:          PushTokens,
+			validWorkerTypes:    validWorkerTypeList,
+			expected:            nil,
+			expectedErrNil:      false,
+			expectedErrContains: "is not in the list of valid worker types",
+		},
+	}
+	for _, tc := range testCases2 {
+		t.Run(tc.description, func(t *testing.T) {
+			m, err := getWorkerTypeMapFromConfig(*c, tc.workerType, tc.validWorkerTypes)
+			if tc.expectedErrNil {
+				assert.Nil(t, err)
+				assert.Equal(t, tc.expected, m)
+				return
+			}
+			assert.Nil(t, m)
+			assert.ErrorContains(t, err, tc.expectedErrContains)
 		})
 	}
 }

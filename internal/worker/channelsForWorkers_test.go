@@ -18,6 +18,9 @@ package worker
 import (
 	"math/rand"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestNewChannelsForWorkers tests that given different buffer sizes, NewChannelsForWorkers returns a ChannelsForWorkers with all channels
@@ -39,6 +42,11 @@ func TestNewChannelsForWorkers(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.description, func(t *testing.T) {
 			n := NewChannelsForWorkers(test.userInputBufferSize)
+			t.Cleanup(func() {
+				close(n.notificationsChan)
+				close(n.serviceConfigChan)
+				close(n.successChan)
+			})
 			if size := cap(n.GetServiceConfigChan()); size != test.expectedBufferSize {
 				t.Errorf("Buffer size for GetServiceConfigChan() should be %d.  Got %d instead", test.expectedBufferSize, size)
 			}
@@ -48,4 +56,33 @@ func TestNewChannelsForWorkers(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Check that when we call closeWorkerSendChans, the send channels are closed properly
+func TestChannelGroupCloseWorkerSendChans(t *testing.T) {
+	chans := NewChannelsForWorkers(1)
+	chans.closeWorkerSendChans()
+	t.Cleanup(func() { close(chans.serviceConfigChan) })
+
+	t.Run("notificationsChan closed", func(t *testing.T) {
+		t.Parallel()
+		assert.Eventually(t,
+			func() bool {
+				_, ok := <-chans.notificationsChan
+				return !ok
+			},
+			100*time.Millisecond, 10*time.Millisecond, "Expected serviceConfigChan to be closed, but it is still open")
+	},
+	)
+
+	t.Run("successChan closed", func(t *testing.T) {
+		t.Parallel()
+		assert.Eventually(t,
+			func() bool {
+				_, ok := <-chans.successChan
+				return !ok
+			},
+			100*time.Millisecond, 10*time.Millisecond, "Expected successChan to be closed, but it is still open")
+	},
+	)
 }

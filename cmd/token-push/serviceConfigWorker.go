@@ -17,8 +17,7 @@ package main
 
 import (
 	"context"
-	"reflect"
-	"runtime"
+	"slices"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -35,21 +34,40 @@ type chansForWorkers interface {
 	GetSuccessChan() <-chan worker.SuccessReporter
 }
 
-// startServiceConfigWorkerForProcessing starts up a worker using the provided workerFunc, gives it a set of channels to receive *worker.Configs
-// and send notification.Notifications on, and sends *worker.Configs to the worker
-func startServiceConfigWorkerForProcessing(ctx context.Context, workerFunc worker.Worker,
+// startServiceConfigWorkerForProcessing starts up the corresponding worker for the provided worker.WorkerType, gives it a set of channels to
+// receive *worker.Configs and send notification.Notifications on, and sends *worker.Configs to the worker
+func startServiceConfigWorkerForProcessing(ctx context.Context, wt worker.WorkerType,
 	serviceConfigs map[string]*worker.Config, timeoutCheckKey timeoutKey) chansForWorkers {
 	ctx, span := otel.GetTracerProvider().Tracer("token-push").Start(ctx, "startServiceConfigWorkerForProcessing")
 	span.SetAttributes(
 		attribute.KeyValue{
-			Key:   "workerFunc",
-			Value: attribute.StringValue(runtime.FuncForPC(reflect.ValueOf(workerFunc).Pointer()).Name()),
+			Key:   "WorkerType",
+			Value: attribute.StringValue(wt.String()),
 		},
 	)
 	defer span.End()
 
-	channels := worker.NewChannelsForWorkers(len(serviceConfigs))
+	funcLogger := exeLogger.WithField("workerType", wt.String())
 
+	// If we don't have any serviceConfigs to process, don't start the worker
+	if len(serviceConfigs) == 0 || serviceConfigs == nil {
+		funcLogger.Debug("No serviceConfigs to process, not starting worker")
+		return nil
+	}
+
+	// Make sure we're trying to start a valid worker
+	if !slices.Contains(validWorkerTypes, wt) {
+		funcLogger.Error("invalid worker type")
+		return nil
+	}
+	w := wt.Worker()
+	if w == nil {
+		funcLogger.Error("no worker found for worker type")
+		return nil
+	}
+
+	// We have a valid worker type, and serviceConfigs to process, so start everything up
+	channels := worker.NewChannelsForWorkers(len(serviceConfigs))
 	startListenerOnWorkerNotificationChans(ctx, channels.GetNotificationsChan())
 
 	var useCtx context.Context
@@ -60,7 +78,7 @@ func startServiceConfigWorkerForProcessing(ctx context.Context, workerFunc worke
 	}
 
 	// Start the work!
-	go workerFunc(useCtx, channels)
+	go w(useCtx, channels)
 
 	// Send our serviceConfigs to the worker
 	for _, sc := range serviceConfigs {
@@ -76,6 +94,11 @@ func startServiceConfigWorkerForProcessing(ctx context.Context, workerFunc worke
 // were removed
 func removeFailedServiceConfigs(chans chansForWorkers, serviceConfigs map[string]*worker.Config) []*worker.Config {
 	failedConfigs := make([]*worker.Config, 0, len(serviceConfigs))
+	if chans == nil {
+		exeLogger.Debug("No chans provided, nothing to remove from serviceConfigs")
+		return failedConfigs
+	}
+
 	for workerSuccess := range chans.GetSuccessChan() {
 		if !workerSuccess.GetSuccess() {
 			exeLogger.WithField(

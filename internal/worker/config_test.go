@@ -209,7 +209,7 @@ func TestBackupConfig(t *testing.T) {
 	c1.unPingableNodes = &unPingableNodes{sync.Map{}}
 	c1.unPingableNodes.Store("foo", struct{}{})
 	c1.workerSpecificConfig = map[WorkerType]map[WorkerSpecificConfigOption]any{
-		PushTokensWorkerType: {
+		PushTokens: {
 			NumRetriesOption: 5,
 		},
 	}
@@ -237,10 +237,10 @@ func TestInitializeWorkerSpecificConfigDefaults(t *testing.T) {
 	m := initializeWorkerSpecificConfigDefaults()
 
 	for _, wt := range []WorkerType{
-		GetKerberosTicketsWorkerType,
-		StoreAndGetTokenWorkerType,
-		PingAggregatorWorkerType,
-		PushTokensWorkerType,
+		GetKerberosTickets,
+		StoreAndGetToken,
+		PingAggregator,
+		PushTokens,
 	} {
 		val, ok := m[wt]
 		if !ok {
