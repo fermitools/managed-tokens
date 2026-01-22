@@ -152,7 +152,10 @@ func setup() error {
 		return err
 	}
 
-	initFlags()
+	if err := initFlags(); err != nil {
+		setupLogger.Error("error setting up command-line flags")
+		return err
+	}
 
 	var versionMessage string
 	if viper.GetBool("version") {
@@ -178,7 +181,10 @@ func setup() error {
 		return err
 	}
 
-	initEnvironment()
+	if err := initEnvironment(); err != nil {
+		setupLogger.Error("error reading in environment variables")
+		return err
+	}
 
 	// TODO Remove this after bug detailed in initFlags() is fixed upstream
 	disableNotifyFlagWorkaround()
@@ -213,7 +219,10 @@ func setup() error {
 		notificationsDisabledBy = DISABLED_BY_FLAG
 	}
 
-	initServices()
+	if err := initServices(); err != nil {
+		setupLogger.Error("Fatal error setting up services")
+		return err
+	}
 
 	if err := initTimeouts(); err != nil {
 		setupLogger.Error("Fatal error setting up timeouts")
@@ -652,7 +661,7 @@ func run(ctx context.Context) error {
 
 // Setup helper functions
 
-func initFlags() {
+func initFlags() error {
 	// Defaults
 	viper.SetDefault("notifications.admin_email", "fife-group@fnal.gov")
 
@@ -672,7 +681,7 @@ func initFlags() {
 	pflag.Bool("version", false, "Version of Managed Tokens library")
 
 	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	return viper.BindPFlags(pflag.CommandLine)
 
 	// Aliases
 	// TODO There's a possible bug in viper, where pflags don't get affected by registering aliases.  The following should work, at least for one alias:
@@ -721,8 +730,8 @@ func checkRunOnboardingFlags() error {
 // Environment variables to read into Viper config
 // Note: In keeping with best practices, these can be overridden by command line flags or direct
 // in-code overrides.  This only sets the initial state of the given viper keys.
-func initEnvironment() {
-	viper.BindEnv("collectorHost", environment.CondorCollectorHost.EnvVarKey())
+func initEnvironment() error {
+	return viper.BindEnv("collectorHost", environment.CondorCollectorHost.EnvVarKey())
 }
 
 // Set up logs
@@ -854,9 +863,12 @@ func initMetrics() error {
 }
 
 // Setup of services
-func initServices() {
+func initServices() error {
 	// Grab HTGETTOKENOPTS if it's there
-	viper.BindEnv("ORIG_HTGETTOKENOPTS", "HTGETTOKENOPTS")
+	if err := viper.BindEnv("ORIG_HTGETTOKENOPTS", environment.HtgettokenOpts.EnvVarKey()); err != nil {
+		log.Errorf("error binding %s environment variable: %v", environment.HtgettokenOpts.EnvVarKey(), err)
+		return err
+	}
 	// If experiment or service is passed in on command line, ONLY generate and push tokens for that experiment/service
 	switch {
 	case viper.GetString("experiment") != "":
@@ -881,6 +893,8 @@ func initServices() {
 			}
 		}
 	}
+
+	return nil
 }
 
 // initTracing initializes the tracing configuration and returns a function to shutdown the

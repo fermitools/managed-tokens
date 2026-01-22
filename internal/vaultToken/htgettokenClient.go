@@ -59,7 +59,7 @@ func NewHtgettokenClient(vaultServer, vaultTokenFile, outFile string, env *envir
 
 	var err error
 
-	var useVaultTokenFile string = vaultTokenFile
+	var useVaultTokenFile = vaultTokenFile
 	if vaultTokenFile == "" {
 		useVaultTokenFile, err = getDefaultVaultTokenLocation()
 		if err != nil {
@@ -67,7 +67,7 @@ func NewHtgettokenClient(vaultServer, vaultTokenFile, outFile string, env *envir
 		}
 	}
 
-	var useOutFile string = outFile
+	var useOutFile = outFile
 	if outFile == "" {
 		useOutFile, err = getDefaultBearerTokenFileLocation()
 		if err != nil {

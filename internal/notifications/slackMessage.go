@@ -71,7 +71,7 @@ func (s *slackMessage) sendMessage(ctx context.Context, message string) error {
 		return nil
 	}
 
-	msg := []byte(fmt.Sprintf(`{"text": "%s"}`, strings.Replace(message, "\"", "\\\"", -1)))
+	msg := []byte(fmt.Sprintf(`{"text": "%s"}`, strings.ReplaceAll(message, "\"", "\\\"")))
 	req, err := http.NewRequest("POST", s.url, bytes.NewBuffer(msg))
 	if err != nil {
 		tracing.LogErrorWithTrace(span, log.NewEntry(log.StandardLogger()), fmt.Sprintf("Error sending slack message: %s", err.Error()))

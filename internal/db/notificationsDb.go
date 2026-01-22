@@ -189,7 +189,7 @@ func (s *setupErrorCount) unpackDataRow(resultRow []any) (dataRowUnpacker, error
 	// Type check each element
 	serviceVal, serviceTypeOk := resultRow[0].(string)
 	countVal, countTypeOk := resultRow[1].(int64)
-	if !(serviceTypeOk && countTypeOk) {
+	if !serviceTypeOk || !countTypeOk {
 		msg := "setup errors query result has wrong type.  Expected (string, int64)"
 		log.Errorf("%s: got (%T, %T)", msg, resultRow[0], resultRow[1])
 		return nil, errDatabaseDataWrongType
@@ -335,7 +335,7 @@ func (p *pushErrorCount) unpackDataRow(resultRow []any) (dataRowUnpacker, error)
 	serviceVal, serviceTypeOk := resultRow[0].(string)
 	nodeVal, nodeTypeOk := resultRow[1].(string)
 	countVal, countTypeOk := resultRow[2].(int64)
-	if !(serviceTypeOk && nodeTypeOk && countTypeOk) {
+	if !serviceTypeOk || !nodeTypeOk || !countTypeOk {
 		msg := "push errors query result has wrong type.  Expected (string, string, int64)"
 		log.Errorf("%s: got (%T, %T, %T)", msg, resultRow[0], resultRow[1], resultRow[2])
 		return nil, errDatabaseDataWrongType

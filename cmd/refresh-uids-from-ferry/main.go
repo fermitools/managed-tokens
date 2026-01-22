@@ -109,7 +109,10 @@ func setup() error {
 		return err
 	}
 
-	initFlags() // Parse our flags
+	if err := initFlags(); err != nil { // Parse our flags
+		setupLogger.Error("error setting up command line flags")
+		return err
+	}
 
 	var versionMessage string
 	if viper.GetBool("version") {
@@ -153,7 +156,7 @@ func setup() error {
 	return nil
 }
 
-func initFlags() {
+func initFlags() error {
 	// Defaults
 	viper.SetDefault("notifications.admin_email", "fife-group@fnal.gov")
 
@@ -169,7 +172,7 @@ func initFlags() {
 	pflag.Bool("version", false, "Version of Managed Tokens library")
 
 	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	return viper.BindPFlags(pflag.CommandLine)
 
 	// Aliases
 	// TODO There's a possible bug in viper, where pflags don't get affected by registering aliases.  The following should work, at least for one alias:
