@@ -163,6 +163,7 @@ func initFlags() {
 	pflag.StringP("configfile", "c", "", "Specify alternate config file")
 	pflag.Bool("disable-notifications", false, "Do not send admin notifications")
 	pflag.Bool("dont-notify", false, "Same as --disable-notifications")
+	pflag.Bool("no-loki", false, "Disable sending logs to Loki (should only be used in testing or temporary debugging)")
 	pflag.BoolP("test", "t", false, "Test mode.  Query FERRY, but do not make any database changes")
 	pflag.BoolP("verbose", "v", false, "Turn on verbose mode")
 	pflag.Bool("version", false, "Version of Managed Tokens library")
@@ -231,25 +232,29 @@ func initLogs() {
 	}, &log.TextFormatter{FullTimestamp: true}))
 
 	// Loki.  Example here taken from README: https://github.com/YuKitsune/lokirus/blob/main/README.md
-	lokiOpts := lokirus.NewLokiHookOptions().
-		// Grafana doesn't have a "panic" level, but it does have a "critical" level
-		// https://grafana.com/docs/grafana/latest/explore/logs-integration/
-		WithLevelMap(lokirus.LevelMap{log.PanicLevel: "critical"}).
-		WithFormatter(&log.JSONFormatter{}).
-		WithStaticLabels(lokirus.Labels{
-			"app":         "managed-tokens",
-			"command":     currentExecutable,
-			"environment": devEnvironmentLabel,
-		})
-	lokiHook := lokirus.NewLokiHookWithOpts(
-		viper.GetString("loki.host"),
-		lokiOpts,
-		log.InfoLevel,
-		log.WarnLevel,
-		log.ErrorLevel,
-		log.FatalLevel)
+	if viper.GetBool("no-loki") || viper.GetString("loki.host") == "" {
+		log.Info("Loki logging disabled by flag")
+	} else {
+		lokiOpts := lokirus.NewLokiHookOptions().
+			// Grafana doesn't have a "panic" level, but it does have a "critical" level
+			// https://grafana.com/docs/grafana/latest/explore/logs-integration/
+			WithLevelMap(lokirus.LevelMap{log.PanicLevel: "critical"}).
+			WithFormatter(&log.JSONFormatter{}).
+			WithStaticLabels(lokirus.Labels{
+				"app":         "managed-tokens",
+				"command":     currentExecutable,
+				"environment": devEnvironmentLabel,
+			})
+		lokiHook := lokirus.NewLokiHookWithOpts(
+			viper.GetString("loki.host"),
+			lokiOpts,
+			log.InfoLevel,
+			log.WarnLevel,
+			log.ErrorLevel,
+			log.FatalLevel)
 
-	log.AddHook(lokiHook)
+		log.AddHook(lokiHook)
+	}
 
 	exeLogger = log.WithField("executable", currentExecutable)
 	exeLogger.Debugf("Using config file %s", viper.ConfigFileUsed())
