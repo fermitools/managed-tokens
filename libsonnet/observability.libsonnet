@@ -18,6 +18,7 @@
     # Loki settings
     loki: {
         host: "hostname.domain", # Required for loki use
+        response_header_timeout: "1s", # Timeout for HTTP responses from Loki for each request
     },
 
     # Tracing settings

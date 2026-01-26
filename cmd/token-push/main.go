@@ -700,6 +700,11 @@ func initLogs() {
 	} else {
 		lokiClient := http.DefaultClient
 
+		var lokiClientTimeout = 1 * time.Second
+		if _timeout, err := time.ParseDuration(viper.GetString("loki.response_header_timeout")); err == nil {
+			lokiClientTimeout = _timeout
+		}
+
 		var useTransport *http.Transport
 		_transport := http.DefaultTransport
 		if _val, ok := _transport.(*http.Transport); ok {
@@ -707,7 +712,7 @@ func initLogs() {
 			// Since we can't directly pass a context into each request that lokirus makes, we
 			// set a timeout on how long each client request is allowed to take before we get
 			// the response headers back
-			useTransport.ResponseHeaderTimeout = 1 * time.Second
+			useTransport.ResponseHeaderTimeout = lokiClientTimeout
 			lokiClient.Transport = useTransport
 		}
 
