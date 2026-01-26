@@ -698,6 +698,19 @@ func initLogs() {
 	if viper.GetBool("no-loki") || viper.GetString("loki.host") == "" {
 		log.Info("Loki logging disabled by flag")
 	} else {
+		lokiClient := http.DefaultClient
+
+		var useTransport *http.Transport
+		_transport := http.DefaultTransport
+		if _val, ok := _transport.(*http.Transport); ok {
+			useTransport = _val.Clone()
+			// Since we can't directly pass a context into each request that lokirus makes, we
+			// set a timeout on how long each client request is allowed to take before we get
+			// the response headers back
+			useTransport.ResponseHeaderTimeout = 1 * time.Second
+			lokiClient.Transport = useTransport
+		}
+
 		lokiOpts := lokirus.NewLokiHookOptions().
 			// Grafana doesn't have a "panic" level, but it does have a "critical" level
 			// https://grafana.com/docs/grafana/latest/explore/logs-integration/
@@ -707,7 +720,8 @@ func initLogs() {
 				"app":         "managed-tokens",
 				"command":     currentExecutable,
 				"environment": devEnvironmentLabel,
-			})
+			}).
+			WithHttpClient(lokiClient)
 		lokiHook := lokirus.NewLokiHookWithOpts(
 			viper.GetString("loki.host"),
 			lokiOpts,
