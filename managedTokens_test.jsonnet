@@ -306,7 +306,8 @@ test.suite({
                 }
             },
             "loki": {
-                "host": "hostname.domain"
+                "host": "hostname.domain",
+                "response_header_timeout": "1s"
             },
             "minTokenLifetime": "3d",
             "notifications": {
