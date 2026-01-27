@@ -608,6 +608,7 @@ func initFlags() {
 	pflag.Bool("dont-notify", false, "Same as --disable-notifications")
 	pflag.StringP("experiment", "e", "", "Name of single experiment to push tokens")
 	pflag.Bool("list-services", false, "List all configured services in config file")
+	pflag.Bool("no-loki", false, "Disable sending logs to Loki (should only be used in testing or temporary debugging)")
 	pflag.BoolP("push-tokens", "p", false, "Push tokens to nodes after onboarding a service. If -r/--run-onboarding is set, this flag must be set to push tokens.  Otherwise, it is ignored")
 	pflag.BoolP("run-onboarding", "r", false, "Run onboarding for a given service.  Must be used with -s/--service, optionally can be used with -p/--push-tokens")
 	pflag.StringP("service", "s", "", "Service to obtain and push vault tokens for.  Must be of the form experiment_role, e.g. dune_production")
@@ -694,25 +695,48 @@ func initLogs() {
 	}, &log.TextFormatter{FullTimestamp: true}))
 
 	// Loki.  Example here taken from README: https://github.com/YuKitsune/lokirus/blob/main/README.md
-	lokiOpts := lokirus.NewLokiHookOptions().
-		// Grafana doesn't have a "panic" level, but it does have a "critical" level
-		// https://grafana.com/docs/grafana/latest/explore/logs-integration/
-		WithLevelMap(lokirus.LevelMap{log.PanicLevel: "critical"}).
-		WithFormatter(&log.JSONFormatter{}).
-		WithStaticLabels(lokirus.Labels{
-			"app":         "managed-tokens",
-			"command":     currentExecutable,
-			"environment": devEnvironmentLabel,
-		})
-	lokiHook := lokirus.NewLokiHookWithOpts(
-		viper.GetString("loki.host"),
-		lokiOpts,
-		log.InfoLevel,
-		log.WarnLevel,
-		log.ErrorLevel,
-		log.FatalLevel)
+	if viper.GetBool("no-loki") || viper.GetString("loki.host") == "" {
+		log.Info("Loki logging disabled by flag")
+	} else {
+		lokiClient := http.DefaultClient
 
-	log.AddHook(lokiHook)
+		var lokiClientTimeout = 1 * time.Second
+		if _timeout, err := time.ParseDuration(viper.GetString("loki.response_header_timeout")); err == nil {
+			lokiClientTimeout = _timeout
+		}
+
+		var useTransport *http.Transport
+		_transport := http.DefaultTransport
+		if _val, ok := _transport.(*http.Transport); ok {
+			useTransport = _val.Clone()
+			// Since we can't directly pass a context into each request that lokirus makes, we
+			// set a timeout on how long each client request is allowed to take before we get
+			// the response headers back
+			useTransport.ResponseHeaderTimeout = lokiClientTimeout
+			lokiClient.Transport = useTransport
+		}
+
+		lokiOpts := lokirus.NewLokiHookOptions().
+			// Grafana doesn't have a "panic" level, but it does have a "critical" level
+			// https://grafana.com/docs/grafana/latest/explore/logs-integration/
+			WithLevelMap(lokirus.LevelMap{log.PanicLevel: "critical"}).
+			WithFormatter(&log.JSONFormatter{}).
+			WithStaticLabels(lokirus.Labels{
+				"app":         "managed-tokens",
+				"command":     currentExecutable,
+				"environment": devEnvironmentLabel,
+			}).
+			WithHttpClient(lokiClient)
+		lokiHook := lokirus.NewLokiHookWithOpts(
+			viper.GetString("loki.host"),
+			lokiOpts,
+			log.InfoLevel,
+			log.WarnLevel,
+			log.ErrorLevel,
+			log.FatalLevel)
+
+		log.AddHook(lokiHook)
+	}
 
 	exeLogger = log.WithField("executable", currentExecutable)
 	exeLogger.Debugf("Using config file %s", viper.ConfigFileUsed())
