@@ -72,8 +72,8 @@ type workerRetryConfig struct {
 func setAllWorkerRetryValues(workerRetryMap map[worker.WorkerType]workerRetryConfig) worker.ConfigOption {
 	return func(c *worker.Config) error {
 		for wt, wr := range workerRetryMap {
-			worker.SetWorkerSpecificConfigOption(wt, worker.NumRetriesOption, wr.numRetries)(c)
-			worker.SetWorkerSpecificConfigOption(wt, worker.RetrySleepOption, wr.retrySleep)(c)
+			worker.SetWorkerSpecificConfigOption(wt, worker.NumRetriesOption, wr.numRetries)(c) // nolint:errcheck
+			worker.SetWorkerSpecificConfigOption(wt, worker.RetrySleepOption, wr.retrySleep)(c) // nolint:errcheck
 		}
 		return nil
 	}

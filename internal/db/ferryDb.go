@@ -170,7 +170,7 @@ func (m *ManagedTokensDatabase) GetUIDByUsername(ctx context.Context, username s
 		funcLogger.Errorf("Could not prepare query to get UID: %s", err)
 		return uid, err
 	}
-	defer stmt.Close()
+	defer stmt.Close() // nolint:errcheck
 
 	err = stmt.QueryRowContext(dbContext, username).Scan(&uid)
 	if err != nil {

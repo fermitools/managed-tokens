@@ -465,8 +465,8 @@ func parseVaultServerFromEnvSetting(envSetting string) (string, error) {
 	}
 
 	envSettingFlagSet := pflag.NewFlagSet("envSetting", pflag.ContinueOnError)
-	envSettingFlagSet.ParseErrorsWhitelist.UnknownFlags = true // We're ok with unknown flags - just skip them
-	var vaultServerPtr *string = envSettingFlagSet.StringP("vaultserver", "a", "", "")
+	envSettingFlagSet.ParseErrorsWhitelist.UnknownFlags = true                         // We're ok with unknown flags - just skip them
+	var vaultServerPtr *string = envSettingFlagSet.StringP("vaultserver", "a", "", "") // nolint:staticcheck
 	if err = envSettingFlagSet.Parse(envSettingArgs); err != nil {
 		log.Errorf("Could not parse environment setting flags, %s", err)
 		return "", err

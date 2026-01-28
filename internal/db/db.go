@@ -216,7 +216,7 @@ func getValuesTransactionRunner(ctx context.Context, db *sql.DB, getStatementStr
 		)
 		return data, err
 	}
-	defer rows.Close()
+	defer rows.Close() // nolint:errcheck
 
 	// Get column names so we can get the length of each row
 	cols, err := rows.Columns()
@@ -321,7 +321,7 @@ func insertValuesTransactionRunner(ctx context.Context, db *sql.DB, insertStatem
 		tracing.LogErrorWithTrace(span, log.NewEntry(log.StandardLogger()), fmt.Sprintf("Could not prepare INSERT statement to database: %s", err))
 		return err
 	}
-	defer insertStatement.Close()
+	defer insertStatement.Close() // nolint:errcheck
 
 	argSlice := make([]string, 0)
 	// Run the passed-in insert statement on insertData

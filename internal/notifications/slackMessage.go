@@ -94,7 +94,7 @@ func (s *slackMessage) sendMessage(ctx context.Context, message string) error {
 		return e
 	}
 
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint:errcheck
 
 	// Parse the response to make sure we're good
 	if resp.StatusCode != http.StatusOK {

@@ -292,7 +292,7 @@ func run(ctx context.Context) error {
 				Notification: notifications.NewSetupError(msg, currentExecutable),
 			}
 		} else {
-			defer database.Close()
+			defer database.Close() // nolint:errcheck
 		}
 	}
 
@@ -323,7 +323,7 @@ func run(ctx context.Context) error {
 		} else {
 			close(aReceiveChan)
 			// We don't check the error here, because we don't want to halt execution if the admin message can't be sent.  Just log it and move on
-			sendAdminNotifications(ctx, admNotMgr, &adminNotifications)
+			sendAdminNotifications(ctx, admNotMgr, &adminNotifications) // nolint:errcheck
 		}
 	}()
 
@@ -1004,7 +1004,7 @@ func addServiceToServicesSlice(services []service.Service, configExperiment, rea
 func getDevEnvironmentLabel() string {
 	// For devs, this variable can be set to differentiate between dev and prod for metrics, for example
 	viper.SetDefault("devEnvironmentLabel", devEnvironmentLabelDefault)
-	viper.BindEnv("devEnvironmentLabel", "MANAGED_TOKENS_DEV_ENVIRONMENT_LABEL")
+	viper.BindEnv("devEnvironmentLabel", "MANAGED_TOKENS_DEV_ENVIRONMENT_LABEL") // nolint:errcheck
 	return viper.GetString("devEnvironmentLabel")
 }
 

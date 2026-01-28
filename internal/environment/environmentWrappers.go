@@ -37,7 +37,7 @@ func KerberosEnvironmentWrappedCommand(ctx context.Context, environ *CommandEnvi
 	)
 	defer span.End()
 
-	os.Unsetenv(Krb5ccname.EnvVarKey())
+	os.Unsetenv(Krb5ccname.EnvVarKey()) // nolint:errcheck
 
 	cmd := exec.CommandContext(ctx, name, arg...)
 
@@ -61,7 +61,7 @@ func EnvironmentWrappedCommand(ctx context.Context, environ *CommandEnvironment,
 
 	// If any of the supported CommandEnvironment keys are set, unset them now
 	for _, field := range getAllSupportedCommandEnvironmentFields() {
-		os.Unsetenv(field.EnvVarKey())
+		os.Unsetenv(field.EnvVarKey()) // nolint:errcheck
 	}
 
 	cmd := exec.CommandContext(ctx, name, arg...)

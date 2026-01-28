@@ -442,7 +442,7 @@ func run(ctx context.Context) error {
 		}
 		return fmt.Errorf("%s: %w", msg, err)
 	}
-	defer database.Close()
+	defer database.Close() // nolint:errcheck
 	span.AddEvent("Opened ManagedTokensDatabase")
 
 	// Send admin notifications at end of run
@@ -459,7 +459,7 @@ func run(ctx context.Context) error {
 		defer func() {
 			// We don't check the error here, because we don't want to halt execution if the admin message can't be sent.  Just log it and move on
 			close(aReceiveChan)
-			sendAdminNotifications(ctx, admNotMgr, &adminNotifications)
+			sendAdminNotifications(ctx, admNotMgr, &adminNotifications) // nolint:errcheck
 		}()
 	}
 
@@ -521,7 +521,7 @@ func run(ctx context.Context) error {
 		}
 		defer func() {
 			prefix := environment.FILE.String()
-			os.RemoveAll(strings.TrimPrefix(sc.GetValue(environment.Krb5ccname), prefix))
+			os.RemoveAll(strings.TrimPrefix(sc.GetValue(environment.Krb5ccname), prefix)) // nolint:errcheck
 			exeLogger.Info("Cleared kerberos cache")
 		}()
 		authFunc = withKerberosJWTAuth(sc)

@@ -169,7 +169,7 @@ func withKerberosJWTAuth(serviceConfig *worker.Config) func() func(context.Conte
 				tracing.LogErrorWithTrace(span, exeLogger, "Could not create temp file for bearer token to use for ferry jwt auth")
 				return &http.Response{}, err
 			}
-			defer os.Remove(bearerTokenFile.Name())
+			defer os.Remove(bearerTokenFile.Name()) // nolint:errcheck
 
 			// Get our bearer token and locate it
 			h, err := vaultToken.NewHtgettokenClient(

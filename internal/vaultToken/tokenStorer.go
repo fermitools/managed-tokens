@@ -40,7 +40,9 @@ var vaultExecutables = map[string]string{
 
 func init() {
 	oldPath := os.Getenv("PATH")
-	os.Setenv("PATH", fmt.Sprintf("%s:/usr/bin:/usr/sbin", oldPath))
+	if err := os.Setenv("PATH", fmt.Sprintf("%s:/usr/bin:/usr/sbin", oldPath)); err != nil {
+		log.WithField("error", err).Error("Could not set PATH environment variable")
+	}
 	if err := utils.CheckForExecutables(vaultExecutables); err != nil {
 		log.WithField("PATH", os.Getenv("PATH")).Fatal("Could not find path to condor executables")
 	}
