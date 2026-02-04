@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -112,3 +113,151 @@ func (f *fakeTokenStorerAndGetter) GetAndStoreToken(ctx context.Context, service
 
 func (f *fakeTokenStorerAndGetter) GetCredd() string       { return f.credd }
 func (f *fakeTokenStorerAndGetter) GetVaultServer() string { return f.vaultServer }
+
+// Tests:
+// Constructor to initialize cache map
+// Cache hit/miss not necessary, since that's already in the sync.Map logic
+func TestNewCachedTokenStorerAndGetter(t *testing.T) {
+	testService := "test_service"
+	testCredd := "test_credd"
+	testVaultServer := "test_vault_server"
+	f := &fakeTokenStorerAndGetter{t: t, credd: testCredd, vaultServer: testVaultServer, shouldFail: false}
+
+	// Are the credd and vault server set properly?
+	checkCreddAndVaultServer := func(t *testing.T, c *cachedTokenStorerAndGetter) {
+		assert.Equal(t, c.GetCredd(), testCredd)
+		assert.Equal(t, c.GetVaultServer(), testVaultServer)
+	}
+
+	// Check that the cache map has our test credd/test service combo stored correctly
+	checkCacheForTestCreddAndTestService := func(t *testing.T, c *cachedTokenStorerAndGetter) {
+		_, ok := c.cache[testCredd][testService]
+		assert.True(t, ok)
+	}
+
+	// Check that before we populate the cache, it's empty, and after populating, it has the expected values
+	checkInitAndPopulatedCache := func(t *testing.T, c *cachedTokenStorerAndGetter) {
+		// Before storing anything, the map should be initialized with just the credd value
+		_, ok := c.cache[testCredd]
+		assert.True(t, ok)
+
+		// Now, we populate the cache map
+		c.cache[testCredd] = make(map[string]struct{})
+		c.cache[testCredd][testService] = struct{}{}
+		checkCacheForTestCreddAndTestService(t, c)
+	}
+
+	type testCase struct {
+		description  string
+		currentCache map[string]map[string]struct{}
+		cacheTest    func(t *testing.T, c *cachedTokenStorerAndGetter)
+	}
+
+	testCases := []testCase{
+		{
+			description:  "nil map passed in",
+			currentCache: nil,
+			cacheTest:    checkInitAndPopulatedCache,
+		},
+		{
+			description:  "empty non-nil map passed in",
+			currentCache: make(map[string]map[string]struct{}),
+			cacheTest:    checkInitAndPopulatedCache,
+		},
+		{
+			description: "pre-existing cache map passed in",
+			currentCache: map[string]map[string]struct{}{
+				testCredd: {
+					testService: struct{}{},
+				},
+			},
+			cacheTest: checkCacheForTestCreddAndTestService,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			c := newCachedTokenStorerAndGetter(f, tc.currentCache)
+			checkCreddAndVaultServer(t, &c)
+			tc.cacheTest(t, &c)
+		})
+	}
+}
+
+func TestCachedTokenStorerAndGetterStoreCacheValue(t *testing.T) {
+	testService := "test_service"
+	testCredd := "test_credd"
+	testVaultServer := "test_vault_server"
+	f := &fakeTokenStorerAndGetter{t: t, credd: testCredd, vaultServer: testVaultServer, shouldFail: false}
+	c := cachedTokenStorerAndGetter{
+		TokenStorerAndGetter: f,
+		cache:                make(map[string]map[string]struct{}),
+	}
+
+	// Test storing a new credd/service combo
+	t.Run("store new credd/service combo", func(t *testing.T) {
+		c.store(testService)
+		_, ok := c.cache[testCredd][testService]
+		assert.True(t, ok)
+	})
+
+	// If we have already stored this credd/service combo, storing it again should be a no-op
+	t.Run("store existing credd/service combo", func(t *testing.T) {
+		service := "test_service_2"
+		// Pre-populate the cache
+		c.cache[testCredd] = make(map[string]struct{})
+		c.cache[testCredd][service] = struct{}{}
+
+		// Now try to store same values again
+		c.store(service)
+		_, ok := c.cache[testCredd][service]
+		assert.True(t, ok)
+	})
+
+	// Try storing two different services in 2 different credds concurrently (should be safe due to mutex)
+	t.Run("concurrent store of different service combos", func(t *testing.T) {
+		var wg sync.WaitGroup
+		service2 := "service2"
+		service3 := "service3"
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			c.store(service2)
+		}()
+		go func() {
+			defer wg.Done()
+			c.store(service3)
+		}()
+		wg.Wait()
+
+		_, ok := c.cache[testCredd][service2]
+		assert.True(t, ok)
+		_, ok = c.cache[testCredd][service3]
+		assert.True(t, ok)
+	})
+}
+
+func TestCachedTokenStorerAndGetterHasCacheValue(t *testing.T) {
+	testService := "test_service"
+	testCredd := "test_credd"
+	testVaultServer := "test_vault_server"
+	f := &fakeTokenStorerAndGetter{t: t, credd: testCredd, vaultServer: testVaultServer, shouldFail: false}
+	c := cachedTokenStorerAndGetter{
+		TokenStorerAndGetter: f,
+		cache: map[string]map[string]struct{}{
+			testCredd: {
+				testService: struct{}{},
+			},
+		},
+	}
+
+	// Test loading an existing credd/service combo
+	t.Run("existing credd/service combo", func(t *testing.T) {
+		assert.True(t, c.has(testService))
+	})
+
+	// Test hasing a non-existing service under existing credd
+	t.Run("non-existing service under existing credd", func(t *testing.T) {
+		assert.False(t, c.has("non_existing_service"))
+	})
+}

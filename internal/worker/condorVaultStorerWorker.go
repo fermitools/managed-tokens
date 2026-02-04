@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -281,7 +282,6 @@ func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, ser
 	}
 
 	// Store vault token on credd
-	// if err := vaultToken.StoreAndValidateToken(ctx, ts, environ); err != nil {
 	if err := t.GetAndStoreToken(ctx, serviceName, interactive); err != nil {
 		storeFailureCount.WithLabelValues(serviceName, t.GetCredd()).Inc()
 		span.SetStatus(codes.Error, "could not store or validate vault token")
@@ -302,3 +302,54 @@ type TokenStorerAndGetter interface {
 	GetCredd() string
 	GetVaultServer() string
 }
+
+type cachedTokenStorerAndGetter struct {
+	TokenStorerAndGetter
+	// key is credd, value is serviceName:struct{}{} for fast lookup.
+	// We're not using a sync.Map here since there is no concurrent access of this type
+	cache map[string]map[string]struct{}
+	mux   sync.Mutex
+}
+
+func newCachedTokenStorerAndGetter(t TokenStorerAndGetter, currentCache map[string]map[string]struct{}) cachedTokenStorerAndGetter {
+	if currentCache == nil {
+		currentCache = make(map[string]map[string]struct{})
+	}
+	if _, ok := currentCache[t.GetCredd()]; !ok {
+		currentCache[t.GetCredd()] = make(map[string]struct{})
+	}
+	return cachedTokenStorerAndGetter{
+		TokenStorerAndGetter: t,
+		cache:                currentCache,
+	}
+}
+
+func (c *cachedTokenStorerAndGetter) store(serviceName string) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	if _, ok := c.cache[c.GetCredd()]; !ok {
+		c.cache[c.GetCredd()] = make(map[string]struct{})
+	}
+	c.cache[c.GetCredd()][serviceName] = struct{}{}
+}
+
+func (c *cachedTokenStorerAndGetter) has(serviceName string) bool {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+
+	if _, ok := c.cache[c.GetCredd()]; !ok {
+		return false
+	}
+	if _, ok := c.cache[c.GetCredd()][serviceName]; !ok {
+		return false
+	}
+	return true
+}
+
+// At storeAndGetTokenWorker scope-level,
+// Need type that has a TokenStorerAndGetter, and also has a cache (sync.Map, since we're writing keys once, and reading many times) -- DONE
+// This cache should be able to be set at type creation time (the first time, it will be empty, but then it will be mutated)
+// The type should provide for accessing an internal cache -- DONE
+// Then, in storeAndGetTokensForSchedd, we can check the cache first. If the cache has an entry for the credd/serviceName combo, don't get the token again
+//
