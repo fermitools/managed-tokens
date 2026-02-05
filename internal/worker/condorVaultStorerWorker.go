@@ -119,6 +119,9 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 		log.Debug("Using default timeout for vault storer")
 	}
 
+	// Initialize cache for worker so we don't store the same token in the same credd more than once.
+	cache := make(map[string]map[string]struct{})
+
 	for sc := range chans.serviceConfigChan {
 		func(sc *Config) {
 			success := &vaultStorerSuccess{
@@ -160,12 +163,16 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 						useTokenStorerAndGetter = vaultToken.NewVaultStorerClient(schedd, sc.VaultServer, &sc.CommandEnvironment)
 					}
 
+					// Wrap the TokenStorerAndGetter in a cachedTokenStorerAndGetter
+					c := newCachedTokenStorerAndGetter(useTokenStorerAndGetter, cache) // Since cache is a map, it's passed by reference,
+					// so any updates in the storeAndGetTokensForSchedd call will carry to the next iteration
+
 					vaultStorerContext, vaultStorerCancel := context.WithTimeout(ctx, vaultStorerTimeout)
 					defer vaultStorerCancel()
 
 					if err := storeAndGetTokensForSchedd(
 						vaultStorerContext,
-						useTokenStorerAndGetter,
+						&c,
 						sc.Service.Name(),
 						sc.ServiceCreddVaultTokenPathRoot,
 						interactive); err != nil {
@@ -216,7 +223,7 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 //  2. Ensures that any new token obtained is stored for future use, provided the operation succeeds.
 //  3. Calls the provided TokenStorerAndGetter to obtain and store a new vault token, optionally
 //     using interactive mode.
-func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
+func storeAndGetTokensForSchedd(ctx context.Context, t *cachedTokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.StoreAndGetTokensForSchedd")
 	span.SetAttributes(attribute.String("tokenRootPath", tokenRootPath))
 	span.SetAttributes(attribute.String("service", serviceName))
@@ -231,11 +238,18 @@ func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, ser
 	})
 	start := time.Now()
 
-	// Before we stage any prior vault token, check to make sure our context hasn't already been canceled
+	// Before we do anything, check to make sure our context hasn't already been canceled
 	if ctx.Err() != nil {
 		tracing.LogErrorWithTrace(span, funcLogger, "context was canceled or the deadline exceeded before token vault staging.  Will not attempt to stage a stored token file or store vault token")
 		success = false
 		return ctx.Err()
+	}
+
+	// First, check our cache.  If it has the combo of t.GetCredd() and serviceName, we already have the token, so stop here
+	if t.has(serviceName) {
+		msg := "Token for service/credd combination already stored in cache for this worker run.  Skipping store and get operation."
+		tracing.LogSuccessWithTrace(span, funcLogger, msg)
+		return nil
 	}
 
 	// Stage prior vault token, if it exists
@@ -287,6 +301,9 @@ func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, ser
 		span.SetStatus(codes.Error, "could not store or validate vault token")
 		return err
 	}
+
+	// Add to cache that we have stored this token for this credd/serviceName combo
+	t.store(serviceName)
 
 	dur := time.Since(start).Seconds()
 	tokenStoreTimestamp.WithLabelValues(serviceName, t.GetCredd()).SetToCurrentTime()
