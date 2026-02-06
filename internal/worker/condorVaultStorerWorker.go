@@ -145,6 +145,15 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 				interactive = false
 			}
 
+			useCache, err := getCachedTokenStorerOptionFromConfig(*sc, StoreAndGetToken)
+			if err != nil && !errors.Is(err, errNoWorkerTypeMapInConfig) {
+				configLogger.Warn("Could not get cached token storer option from config.  Using cached token storer by default")
+				useCache = true
+			}
+			if !useCache {
+				configLogger.Info("Not using cache for token storing for this service")
+			}
+
 			errsToReport := make([]error, 0) // slice of errors we need to specifically highlight
 			for _, schedd := range sc.Schedds {
 				func(ctx context.Context, schedd string) {
@@ -163,16 +172,22 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 						useTokenStorerAndGetter = vaultToken.NewVaultStorerClient(schedd, sc.VaultServer, &sc.CommandEnvironment)
 					}
 
-					// Wrap the TokenStorerAndGetter in a cachedTokenStorerAndGetter
-					c := newCachedTokenStorerAndGetter(useTokenStorerAndGetter, cache) // Since cache is a map, it's passed by reference,
-					// so any updates in the storeAndGetTokensForSchedd call will carry to the next iteration
+					// Wrap the TokenStorerAndGetter in a CachedTokenStorerAndGetter
+					var c CachedTokenStorerAndGetter
+					if !useCache {
+						c = &noOpCachedTokenStorerAndGetter{useTokenStorerAndGetter}
+					} else {
+						_c := newCachedTokenStorerAndGetter(useTokenStorerAndGetter, cache) // Since cache is a map, it's passed by reference,
+						// so any updates in the storeAndGetTokensForSchedd call will carry to the next iteration
+						c = &_c
+					}
 
 					vaultStorerContext, vaultStorerCancel := context.WithTimeout(ctx, vaultStorerTimeout)
 					defer vaultStorerCancel()
 
 					if err := storeAndGetTokensForSchedd(
 						vaultStorerContext,
-						&c,
+						c,
 						sc.Service.Name(),
 						sc.ServiceCreddVaultTokenPathRoot,
 						interactive); err != nil {
@@ -223,7 +238,7 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 //  2. Ensures that any new token obtained is stored for future use, provided the operation succeeds.
 //  3. Calls the provided TokenStorerAndGetter to obtain and store a new vault token, optionally
 //     using interactive mode.
-func storeAndGetTokensForSchedd(ctx context.Context, t *cachedTokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
+func storeAndGetTokensForSchedd(ctx context.Context, t CachedTokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.StoreAndGetTokensForSchedd")
 	span.SetAttributes(attribute.String("tokenRootPath", tokenRootPath))
 	span.SetAttributes(attribute.String("service", serviceName))
@@ -246,7 +261,7 @@ func storeAndGetTokensForSchedd(ctx context.Context, t *cachedTokenStorerAndGett
 	}
 
 	// First, check our cache.  If it has the combo of t.GetCredd() and serviceName, we already have the token, so stop here
-	if t.has(serviceName) {
+	if t.hasInCache(serviceName) {
 		msg := "Token for service/credd combination already stored in cache for this worker run.  Skipping store and get operation."
 		tracing.LogSuccessWithTrace(span, funcLogger, msg)
 		return nil
@@ -303,7 +318,7 @@ func storeAndGetTokensForSchedd(ctx context.Context, t *cachedTokenStorerAndGett
 	}
 
 	// Add to cache that we have stored this token for this credd/serviceName combo
-	t.store(serviceName)
+	t.storeInCache(serviceName)
 
 	dur := time.Since(start).Seconds()
 	tokenStoreTimestamp.WithLabelValues(serviceName, t.GetCredd()).SetToCurrentTime()
@@ -320,6 +335,14 @@ type TokenStorerAndGetter interface {
 	GetVaultServer() string
 }
 
+// CachedTokenStorerAndGetter is a TokenStorerAndGetter that also caches service/credd combinations
+type CachedTokenStorerAndGetter interface {
+	TokenStorerAndGetter
+	storeInCache(serviceName string)
+	hasInCache(serviceName string) bool
+}
+
+// TODO: Docstrings for all of these
 type cachedTokenStorerAndGetter struct {
 	TokenStorerAndGetter
 	// key is credd, value is serviceName:struct{}{} for fast lookup.
@@ -341,7 +364,7 @@ func newCachedTokenStorerAndGetter(t TokenStorerAndGetter, currentCache map[stri
 	}
 }
 
-func (c *cachedTokenStorerAndGetter) store(serviceName string) {
+func (c *cachedTokenStorerAndGetter) storeInCache(serviceName string) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -351,7 +374,7 @@ func (c *cachedTokenStorerAndGetter) store(serviceName string) {
 	c.cache[c.GetCredd()][serviceName] = struct{}{}
 }
 
-func (c *cachedTokenStorerAndGetter) has(serviceName string) bool {
+func (c *cachedTokenStorerAndGetter) hasInCache(serviceName string) bool {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
@@ -364,9 +387,12 @@ func (c *cachedTokenStorerAndGetter) has(serviceName string) bool {
 	return true
 }
 
-// At storeAndGetTokenWorker scope-level,
-// Need type that has a TokenStorerAndGetter, and also has a cache (sync.Map, since we're writing keys once, and reading many times) -- DONE
-// This cache should be able to be set at type creation time (the first time, it will be empty, but then it will be mutated)
-// The type should provide for accessing an internal cache -- DONE
-// Then, in storeAndGetTokensForSchedd, we can check the cache first. If the cache has an entry for the credd/serviceName combo, don't get the token again
-//
+type noOpCachedTokenStorerAndGetter struct {
+	TokenStorerAndGetter
+}
+
+func (n *noOpCachedTokenStorerAndGetter) storeInCache(serviceName string) {
+	// No op
+}
+
+func (n *noOpCachedTokenStorerAndGetter) hasInCache(serviceName string) bool { return false }

@@ -42,6 +42,9 @@ const (
 	// supported by the StoreAndGetToken WorkerType, and the value of the AlternateTokenStorerAndGetterOption must be of a type that
 	// implements the TokenStorerAndGetter interface.
 	AlternateTokenStorerAndGetterOption
+	// CachedTokenStorerOption is a worker-specific configuration option that represents whether to use a cached token storer. It is
+	// supported by the StoreAndGetToken WorkerType, and the value of the CachedTokenStorerOption must be of type bool.
+	CachedTokenStorerOption
 	invalidWorkerSpecificConfigOption
 )
 
@@ -91,6 +94,20 @@ func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOptio
 		return ConfigOption(func(*Config) error { return nil }) // No-op
 	}
 	return SetWorkerSpecificConfigOption(w, InteractiveTokenGetterOption, interactive)
+}
+
+// TODO: Set cache flag here.  Check to see if workerType is StoreAndGetToken, and if so, set a cache option like the above func.
+// Then add the option to main() similar to how we control interactive with run-onboarding, but instead with a --no-cache flag or config flag
+// default set in main() will be to use cache
+
+// SetCachedTokenStorerOption sets the cached token storer option for the specified WorkerType.
+// Setting useCache to true enables caching; false disables it.
+// If the WorkerType is not StoreAndGetToken, it returns a no-op ConfigOption.
+func SetCachedTokenStorerOption(w WorkerType, useCache bool) ConfigOption {
+	if w != StoreAndGetToken {
+		return ConfigOption(func(*Config) error { return nil }) // No-op
+	}
+	return SetWorkerSpecificConfigOption(w, CachedTokenStorerOption, useCache)
 }
 
 // SetAlternateTokenGetterOption sets an alternate TokenGetter for the specified WorkerType.
@@ -255,6 +272,29 @@ func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (T
 	}
 
 	return valInterface, nil
+}
+
+// getCachedTokenStorerOptionFromConfig retrieves the cachedTokenStorerOption for a specific worker type from the given configuration.
+func getCachedTokenStorerOptionFromConfig(c Config, w WorkerType) (bool, error) {
+	m, err := getWorkerTypeMapFromConfig(c, w, []WorkerType{StoreAndGetToken})
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return false, errors.New("no cached token storer configuration found for the given worker type")
+		}
+		return false, err
+	}
+
+	val, ok := m[CachedTokenStorerOption]
+	if !ok {
+		return false, fmt.Errorf("no CachedTokenStorerOption found for workerType %s in workerSpecificConfig", w)
+	}
+
+	valBool, ok := val.(bool)
+	if !ok {
+		return false, fmt.Errorf("value for workerType %s is not of type bool.  Got type %T", w, val)
+	}
+
+	return valBool, nil
 }
 
 func isValidWorkerSpecificConfigOption(option WorkerSpecificConfigOption) bool {

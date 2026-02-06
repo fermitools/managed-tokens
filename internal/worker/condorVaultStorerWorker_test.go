@@ -196,7 +196,7 @@ func TestCachedTokenStorerAndGetterStoreCacheValue(t *testing.T) {
 
 	// Test storing a new credd/service combo
 	t.Run("store new credd/service combo", func(t *testing.T) {
-		c.store(testService)
+		c.storeInCache(testService)
 		_, ok := c.cache[testCredd][testService]
 		assert.True(t, ok)
 	})
@@ -209,7 +209,7 @@ func TestCachedTokenStorerAndGetterStoreCacheValue(t *testing.T) {
 		c.cache[testCredd][service] = struct{}{}
 
 		// Now try to store same values again
-		c.store(service)
+		c.storeInCache(service)
 		_, ok := c.cache[testCredd][service]
 		assert.True(t, ok)
 	})
@@ -222,11 +222,11 @@ func TestCachedTokenStorerAndGetterStoreCacheValue(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			c.store(service2)
+			c.storeInCache(service2)
 		}()
 		go func() {
 			defer wg.Done()
-			c.store(service3)
+			c.storeInCache(service3)
 		}()
 		wg.Wait()
 
@@ -253,11 +253,23 @@ func TestCachedTokenStorerAndGetterHasCacheValue(t *testing.T) {
 
 	// Test loading an existing credd/service combo
 	t.Run("existing credd/service combo", func(t *testing.T) {
-		assert.True(t, c.has(testService))
+		assert.True(t, c.hasInCache(testService))
 	})
 
 	// Test hasing a non-existing service under existing credd
 	t.Run("non-existing service under existing credd", func(t *testing.T) {
-		assert.False(t, c.has("non_existing_service"))
+		assert.False(t, c.hasInCache("non_existing_service"))
 	})
+}
+
+func TestNoOpCachedTokenStorerAndGetter(t *testing.T) {
+	// If we run store and has methods on noOpCachedTokenStorerAndGetter, they should be no-ops, and nothing should get stored
+	testService := "test_service"
+	testCredd := "test_credd"
+	testVaultServer := "test_vault_server"
+	f := &fakeTokenStorerAndGetter{t: t, credd: testCredd, vaultServer: testVaultServer, shouldFail: false}
+	n := &noOpCachedTokenStorerAndGetter{TokenStorerAndGetter: f}
+
+	n.storeInCache(testService)
+	assert.False(t, n.hasInCache(testService))
 }
