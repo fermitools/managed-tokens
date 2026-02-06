@@ -58,6 +58,8 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
                         condorCollectorHostOverride: "specialcollectorhost.domain",
                         defaultRoleFileDestinationTemplateOverride: "/tmp/{{.DesiredUID}}_{{.Account}}",  # Any field in the worker.Config object is supported here
                         disableNotificationsOverride: false, # If true, no notifications will be sent for this role
+                        tokenGetterOverride: "getToken",
+                        noCacheOverride: true,
                     },
                 ),
             },
