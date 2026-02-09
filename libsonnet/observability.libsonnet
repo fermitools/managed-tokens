@@ -1,8 +1,8 @@
 // Observability settings (logs, metrics, tracing)
 {
     local makeLogConfig(executable) = {
-        logfile: "/var/log/"+executable+".log",
-        debugfile: "/var/log/"+executable+".debug.log",
+        logfile: "/var/log/managed-tokens/"+executable+".log",
+        debugfile: "/var/log/managed-tokens/"+executable+".debug.log",
     },
     logs:  {
         "refresh-uids-from-ferry": makeLogConfig("refresh-uids-from-ferry"),

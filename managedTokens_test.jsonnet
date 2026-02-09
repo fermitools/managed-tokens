@@ -297,12 +297,12 @@ test.suite({
             "keytabPath": "/opt/managed-tokens/keytabs",
             "logs": {
                 "refresh-uids-from-ferry": {
-                    "debugfile": "/var/log/refresh-uids-from-ferry.debug.log",
-                    "logfile": "/var/log/refresh-uids-from-ferry.log"
+                    "debugfile": "/var/log/managed-tokens/refresh-uids-from-ferry.debug.log",
+                    "logfile": "/var/log/managed-tokens/refresh-uids-from-ferry.log"
                 },
                 "token-push": {
-                    "debugfile": "/var/log/token-push.debug.log",
-                    "logfile": "/var/log/token-push.log"
+                    "debugfile": "/var/log/managed-tokens/token-push.debug.log",
+                    "logfile": "/var/log/managed-tokens/token-push.log"
                 }
             },
             "loki": {
