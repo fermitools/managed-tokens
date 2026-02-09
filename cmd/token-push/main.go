@@ -434,12 +434,13 @@ func run(ctx context.Context) error {
 			}
 
 			// Figure out if we should disable caching or not for this service config
-			var disableStorerCacheSelector worker.ConfigOption = worker.SetCachedTokenStorerOption(worker.StoreAndGetToken, true) // Default - cache tokens
+			disableCache := false // Default - do not disable caching
 			// If the configuration for a particular service tells us to disable caching, or the --no-cache flag is set, disable caching
 			if getDisableCacheFromConfiguration(serviceConfigPath) || viper.GetBool("no-cache") {
 				funcLogger.Debug("Disabling token storer cache for this service based on configuration or flag")
-				disableStorerCacheSelector = worker.SetCachedTokenStorerOption(worker.StoreAndGetToken, false)
+				disableCache = true
 			}
+			disableStorerCacheSelector := worker.SetCachedTokenStorerOption(worker.StoreAndGetToken, !disableCache)
 
 			// Service-level configuration items that can be defined either in configuration file or on system/environment or have library defaults
 			keytabPath := getKeytabFromConfiguration(serviceConfigPath)
