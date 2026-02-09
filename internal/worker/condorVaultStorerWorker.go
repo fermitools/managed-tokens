@@ -342,15 +342,20 @@ type CachedTokenStorerAndGetter interface {
 	hasInCache(serviceName string) bool
 }
 
-// TODO: Docstrings for all of these
+// cachedTokenStorerAndGetter is a struct that wraps a TokenStorerAndGetter and
+// adds caching functionality to keep track of which service's tokens have been stored in a
+// given credd during the current worker run.  Access to the cache is protected by a mutex to
+// ensure thread safety when the provided storeInCache and hasInCache methods are used.
 type cachedTokenStorerAndGetter struct {
 	TokenStorerAndGetter
 	// key is credd, value is serviceName:struct{}{} for fast lookup.
 	// We're not using a sync.Map here since there is no concurrent access of this type
-	cache map[string]map[string]struct{}
+	cache map[string]map[string]struct{} // {credd: {serviceName: struct{}{}}}
 	mux   sync.Mutex
 }
 
+// newCachedTokenStorerAndGetter returns a new cachedTokenStorerAndGetter that wraps a TokenStorerAndGetter and
+// prepopulates the internal cache with an optional existing cache.
 func newCachedTokenStorerAndGetter(t TokenStorerAndGetter, currentCache map[string]map[string]struct{}) cachedTokenStorerAndGetter {
 	if currentCache == nil {
 		currentCache = make(map[string]map[string]struct{})
@@ -364,6 +369,7 @@ func newCachedTokenStorerAndGetter(t TokenStorerAndGetter, currentCache map[stri
 	}
 }
 
+// storeInCache adds the serviceName and credd combination to the cachedTokenStorerAndGetter cache
 func (c *cachedTokenStorerAndGetter) storeInCache(serviceName string) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
@@ -374,6 +380,7 @@ func (c *cachedTokenStorerAndGetter) storeInCache(serviceName string) {
 	c.cache[c.GetCredd()][serviceName] = struct{}{}
 }
 
+// hasInCache checks whether the serviceName and credd combination is in the cachedTokenStorerAndGetter cache
 func (c *cachedTokenStorerAndGetter) hasInCache(serviceName string) bool {
 	c.mux.Lock()
 	defer c.mux.Unlock()
@@ -387,12 +394,11 @@ func (c *cachedTokenStorerAndGetter) hasInCache(serviceName string) bool {
 	return true
 }
 
+// noOpCachedTokenStorerAndGetter is a struct that implements the CachedTokenStorerAndGetter interface
+// but does not actually cache anything.
 type noOpCachedTokenStorerAndGetter struct {
 	TokenStorerAndGetter
 }
 
-func (n *noOpCachedTokenStorerAndGetter) storeInCache(serviceName string) {
-	// No op
-}
-
+func (n *noOpCachedTokenStorerAndGetter) storeInCache(serviceName string)    {} // No op
 func (n *noOpCachedTokenStorerAndGetter) hasInCache(serviceName string) bool { return false }

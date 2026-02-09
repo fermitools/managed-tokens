@@ -96,10 +96,6 @@ func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOptio
 	return SetWorkerSpecificConfigOption(w, InteractiveTokenGetterOption, interactive)
 }
 
-// TODO: Set cache flag here.  Check to see if workerType is StoreAndGetToken, and if so, set a cache option like the above func.
-// Then add the option to main() similar to how we control interactive with run-onboarding, but instead with a --no-cache flag or config flag
-// default set in main() will be to use cache
-
 // SetCachedTokenStorerOption sets the cached token storer option for the specified WorkerType.
 // Setting useCache to true enables caching; false disables it.
 // If the WorkerType is not StoreAndGetToken, it returns a no-op ConfigOption.
