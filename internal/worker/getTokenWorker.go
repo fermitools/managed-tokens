@@ -105,7 +105,11 @@ func getTokenWorker(ctx context.Context, chans channelGroup) {
 
 	// // For all the serviceConfigChans being sent in, get token
 	for sc := range chans.serviceConfigChan {
-		scLogger := log.WithField("service", sc.Service.Name())
+		scLogger := log.WithFields(log.Fields{
+			"experiment": sc.Service.Experiment(),
+			"role":       sc.Service.Role(),
+			"service":    sc.Name(),
+		})
 
 		success := &getTokenSuccess{
 			Service: sc.Service,
