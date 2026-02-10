@@ -142,14 +142,24 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 			interactive, err := getInteractiveTokenGetterOptionFromConfig(*sc, StoreAndGetToken)
 			if err != nil && !errors.Is(err, errNoWorkerTypeMapInConfig) {
 				configLogger.Warn("Could not get interactive token getter option from config.  Using non-interactive token storer by default")
-				interactive = false
+				interactive = false // Default to not using interactive token getter if there is any error getting the option from config
 			}
 
+			// Note that here, if the configuration option for caching tokens isn't set in the map, we'll get an errNoWorkerTypeMapInConfig error,
+			// and in that case, we want to default to using the cache
+			defaultUseCache := true
 			useCache, err := getCachedTokenStorerOptionFromConfig(*sc, StoreAndGetToken)
-			if err != nil && !errors.Is(err, errNoWorkerTypeMapInConfig) {
+			switch {
+			case errors.Is(err, errNoWorkerTypeMapInConfig): // The default case here - nothing is set in the configuration
+				useCache = defaultUseCache // No config option found for this, so use default
+				configLogger.Debug("No cached token storer configuration found for this worker type.  Using cached token storer by default")
+			case err != nil: // Here, we have some non-nil error that isn't errNoWorkerTypeMapInConfig, which means there was some other error
+				// retrieving the option from the config.  Thus, we want to use the default
+				useCache = defaultUseCache
 				configLogger.Warn("Could not get cached token storer option from config.  Using cached token storer by default")
-				useCache = true
 			}
+			// If there's no error getting the config option for caching, then use whatever the config says
+
 			if !useCache {
 				configLogger.Info("Not using cache for token storing for this service")
 			}

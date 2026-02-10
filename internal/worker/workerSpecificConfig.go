@@ -252,7 +252,7 @@ func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (T
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return nil, errors.New("no token getter configuration found for the given worker type")
+			return nil, fmt.Errorf("%w: %s", err, w)
 		}
 		return nil, err
 	}
@@ -271,11 +271,13 @@ func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (T
 }
 
 // getCachedTokenStorerOptionFromConfig retrieves the cachedTokenStorerOption for a specific worker type from the given configuration.
+// Note that callers should check the error to make sure that no error was returned, and if so, determine the appropriate default value
+// for their use case.
 func getCachedTokenStorerOptionFromConfig(c Config, w WorkerType) (bool, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, []WorkerType{StoreAndGetToken})
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return false, errors.New("no cached token storer configuration found for the given worker type")
+			return false, fmt.Errorf("%w: %s", err, w)
 		}
 		return false, err
 	}
