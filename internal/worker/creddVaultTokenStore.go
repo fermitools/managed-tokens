@@ -201,13 +201,13 @@ func moveFileCrossDevice(src, dst string) error {
 		log.WithField("filename", src).Error("Could not open file for reading")
 		return err
 	}
-	defer srcFile.Close()
+	defer srcFile.Close() // nolint:errcheck
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		log.WithField("filename", dst).Error("Could not open file for writing")
 		return err
 	}
-	defer dstFile.Close()
+	defer dstFile.Close() // nolint:errcheck
 
 	if _, err = io.Copy(dstFile, srcFile); err != nil {
 		log.WithFields(log.Fields{

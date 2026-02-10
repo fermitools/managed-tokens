@@ -161,7 +161,9 @@ func MergeCmdArgs(fs *pflag.FlagSet, extraArgs []string) ([]string, error) {
 	fs.ParseErrorsWhitelist = pflag.ParseErrorsWhitelist{UnknownFlags: true}
 
 	// See if we override any of our args by parsing the extraArgs
-	fs.Parse(extraArgs)
+	if err := fs.Parse(extraArgs); err != nil {
+		return nil, fmt.Errorf("could not parse extra args: %w", err)
+	}
 
 	flags := make([]string, 0)
 	fs.VisitAll(func(f *pflag.Flag) {

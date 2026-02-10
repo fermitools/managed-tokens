@@ -222,7 +222,7 @@ func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, ser
 	span.SetAttributes(attribute.String("credd", t.GetCredd()))
 	defer span.End()
 
-	var success bool = true
+	var success = true
 
 	funcLogger := log.WithFields(log.Fields{
 		"service": serviceName,

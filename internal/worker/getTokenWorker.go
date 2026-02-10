@@ -220,7 +220,7 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 
 		// If proper token obtaining and storage happens, this file actually won't exist by the time this defer runs.  That's fine -
 		// we just want to make sure we clean up if something goes wrong
-		defer os.Remove(tempVaultTokenFile.Name())
+		defer os.Remove(tempVaultTokenFile.Name()) // nolint:errcheck
 		useVTPath = tempVaultTokenFile.Name()
 	}
 
@@ -232,7 +232,7 @@ func (t *tokenGetterConfig) GetToken(ctx context.Context) error {
 	} else {
 		defer func() {
 			funcLogger.WithField("path", _bearerTokenFile.Name()).Debug("Removing bearer token temp file")
-			os.Remove(_bearerTokenFile.Name())
+			os.Remove(_bearerTokenFile.Name()) // nolint:errcheck
 		}()
 	}
 

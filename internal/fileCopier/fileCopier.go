@@ -118,7 +118,9 @@ func rsyncFile(ctx context.Context, source, node, account, dest, sshOptions, rsy
 		return ctx.Err()
 	}
 
-	utils.CheckForExecutables(fileCopierExecutables)
+	if err := utils.CheckForExecutables(fileCopierExecutables); err != nil {
+		return fmt.Errorf("could not find required executables for file copy: %w", err)
+	}
 
 	funcLogger := log.WithFields(log.Fields{
 		"source":       source,

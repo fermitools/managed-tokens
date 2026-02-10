@@ -166,7 +166,7 @@ func GetFERRYUIDData(ctx context.Context, username string, ferryHost string, fer
 		tracing.LogErrorWithTrace(span, funcLogger, err.Error())
 		return &entry, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() // nolint:errcheck
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

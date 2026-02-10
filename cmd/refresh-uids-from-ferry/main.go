@@ -109,7 +109,10 @@ func setup() error {
 		return err
 	}
 
-	initFlags() // Parse our flags
+	if err := initFlags(); err != nil { // Parse our flags
+		setupLogger.Error("error setting up command line flags")
+		return err
+	}
 
 	var versionMessage string
 	if viper.GetBool("version") {
@@ -153,7 +156,7 @@ func setup() error {
 	return nil
 }
 
-func initFlags() {
+func initFlags() error {
 	// Defaults
 	viper.SetDefault("notifications.admin_email", "fife-group@fnal.gov")
 
@@ -169,7 +172,7 @@ func initFlags() {
 	pflag.Bool("version", false, "Version of Managed Tokens library")
 
 	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	return viper.BindPFlags(pflag.CommandLine)
 
 	// Aliases
 	// TODO There's a possible bug in viper, where pflags don't get affected by registering aliases.  The following should work, at least for one alias:
@@ -439,7 +442,7 @@ func run(ctx context.Context) error {
 		}
 		return fmt.Errorf("%s: %w", msg, err)
 	}
-	defer database.Close()
+	defer database.Close() // nolint:errcheck
 	span.AddEvent("Opened ManagedTokensDatabase")
 
 	// Send admin notifications at end of run
@@ -456,7 +459,7 @@ func run(ctx context.Context) error {
 		defer func() {
 			// We don't check the error here, because we don't want to halt execution if the admin message can't be sent.  Just log it and move on
 			close(aReceiveChan)
-			sendAdminNotifications(ctx, admNotMgr, &adminNotifications)
+			sendAdminNotifications(ctx, admNotMgr, &adminNotifications) // nolint:errcheck
 		}()
 	}
 
@@ -518,7 +521,7 @@ func run(ctx context.Context) error {
 		}
 		defer func() {
 			prefix := environment.FILE.String()
-			os.RemoveAll(strings.TrimPrefix(sc.GetValue(environment.Krb5ccname), prefix))
+			os.RemoveAll(strings.TrimPrefix(sc.GetValue(environment.Krb5ccname), prefix)) // nolint:errcheck
 			exeLogger.Info("Cleared kerberos cache")
 		}()
 		authFunc = withKerberosJWTAuth(sc)

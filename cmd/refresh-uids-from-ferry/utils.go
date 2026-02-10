@@ -137,7 +137,7 @@ func getAllAccountsFromConfig() []string {
 // getBearerTokenDefaultLocation returns the default location of the bearer token
 // by looking first at the environment variable BEARER_TOKEN_FILE, and then
 // using the current user's UID to find the default location for the bearer token
-func getBearerTokenDefaultLocation() (string, error) {
+func getBearerTokenDefaultLocation() (string, error) { // nolint:unused
 	var location string
 	if location = os.Getenv("BEARER_TOKEN_FILE"); location != "" {
 		return location, nil
@@ -326,7 +326,7 @@ func getUserPrincipalAndHtgettokenopts() (string, string) {
 func getDevEnvironmentLabel() string {
 	// For devs, this variable can be set to differentiate between dev and prod for metrics, for example
 	viper.SetDefault("devEnvironmentLabel", devEnvironmentLabelDefault)
-	viper.BindEnv("devEnvironmentLabel", "MANAGED_TOKENS_DEV_ENVIRONMENT_LABEL")
+	viper.BindEnv("devEnvironmentLabel", "MANAGED_TOKENS_DEV_ENVIRONMENT_LABEL") // nolint:errcheck
 	return viper.GetString("devEnvironmentLabel")
 }
 

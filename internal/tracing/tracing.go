@@ -29,7 +29,7 @@ func NewOTLPHTTPTraceProvider(ctx context.Context, endpointURL, deploymentEnviro
 			semconv.DeploymentEnvironmentKey.String(deploymentEnvironmentKey),
 		)),
 	)
-	return tp, func(ctx context.Context) { tp.Shutdown(ctx) }, nil
+	return tp, func(ctx context.Context) { tp.Shutdown(ctx) }, nil // nolint:errcheck
 }
 
 // KeyValueForLog is a struct that holds a key and value for logging purposes

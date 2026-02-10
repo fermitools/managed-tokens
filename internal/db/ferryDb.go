@@ -78,7 +78,7 @@ func (f *ferryUidDatum) unpackDataRow(resultRow []any) (dataRowUnpacker, error) 
 	// Type check each element
 	usernameVal, usernameOk := resultRow[0].(string)
 	uidVal, uidOk := resultRow[1].(int64)
-	if !(usernameOk && uidOk) {
+	if !usernameOk || !uidOk {
 		msg := "uid query result datum has wrong type.  Expected (string, int64)"
 		log.Errorf("%s: got (%T, %T)", msg, resultRow[0], resultRow[1])
 		return nil, errDatabaseDataWrongType
@@ -170,7 +170,7 @@ func (m *ManagedTokensDatabase) GetUIDByUsername(ctx context.Context, username s
 		funcLogger.Errorf("Could not prepare query to get UID: %s", err)
 		return uid, err
 	}
-	defer stmt.Close()
+	defer stmt.Close() // nolint:errcheck
 
 	err = stmt.QueryRowContext(dbContext, username).Scan(&uid)
 	if err != nil {
