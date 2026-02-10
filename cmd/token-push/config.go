@@ -418,7 +418,7 @@ func getDisableCacheFromConfiguration(configPath string) bool {
 	if disableCachePath, overridden := getConfigOverridePath(configPath, "noCache"); overridden {
 		return viper.GetBool(disableCachePath)
 	}
-	return false
+	return viper.GetBool("noCache") // default
 }
 
 // resolveDisableNotifications checks each service's configuration to determine if notifications should be disabled.

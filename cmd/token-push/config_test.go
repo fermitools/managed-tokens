@@ -1452,12 +1452,12 @@ func TestGetDisableCacheFromConfiguration(t *testing.T) {
 			false,
 		},
 		{
-			"Global level configuration, no override",
+			"Global level configuration, no override, should return true",
 			func() {
 				viper.Set("noCache", true)
 			},
 			"myservice",
-			false,
+			true,
 		},
 		{
 			"Service-level override set to true",

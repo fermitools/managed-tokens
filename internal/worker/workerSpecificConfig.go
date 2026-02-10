@@ -225,6 +225,8 @@ func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, er
 
 // getAlternateTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
 // If the worker type is not supported or invalid, an error is returned.
+// If the option is not set in the config, the returned error will be errNoWorkerTypeMapInConfig, and callers should check
+// for that error.
 func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGetter, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
 	if err != nil {
@@ -248,8 +250,10 @@ func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGette
 }
 
 // getAlternateTokenStorerAndGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
+// If the option is not set in the config, the returned error will be errNoWorkerTypeMapInConfig, and callers should check
+// for that error.
 func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (TokenStorerAndGetter, error) {
-	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
+	m, err := getWorkerTypeMapFromConfig(c, w, []WorkerType{StoreAndGetToken})
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
 			return nil, fmt.Errorf("%w: %s", err, w)
@@ -272,7 +276,8 @@ func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (T
 
 // getCachedTokenStorerOptionFromConfig retrieves the cachedTokenStorerOption for a specific worker type from the given configuration.
 // Note that callers should check the error to make sure that no error was returned, and if so, determine the appropriate default value
-// for their use case.
+// for their use case.  If the option is not set in the config, the returned error will be errNoWorkerTypeMapInConfig, and callers should check
+// for that error.
 func getCachedTokenStorerOptionFromConfig(c Config, w WorkerType) (bool, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, []WorkerType{StoreAndGetToken})
 	if err != nil {
