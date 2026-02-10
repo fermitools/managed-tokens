@@ -114,9 +114,6 @@ func (f *fakeTokenStorerAndGetter) GetAndStoreToken(ctx context.Context, service
 func (f *fakeTokenStorerAndGetter) GetCredd() string       { return f.credd }
 func (f *fakeTokenStorerAndGetter) GetVaultServer() string { return f.vaultServer }
 
-// Tests:
-// Constructor to initialize cache map
-// Cache hit/miss not necessary, since that's already in the sync.Map logic
 func TestNewCachedTokenStorerAndGetter(t *testing.T) {
 	testService := "test_service"
 	testCredd := "test_credd"
