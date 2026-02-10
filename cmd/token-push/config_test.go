@@ -1436,3 +1436,66 @@ func TestGetTokenGetterOverrideFromConfiguration(t *testing.T) {
 		})
 	}
 }
+func TestGetDisableCacheFromConfiguration(t *testing.T) {
+	type testCase struct {
+		description          string
+		setupTestFunc        func()
+		configPath           string
+		expectedDisableCache bool
+	}
+
+	testCases := []testCase{
+		{
+			"No override set, should return false",
+			func() {},
+			"myservice",
+			false,
+		},
+		{
+			"Global level configuration, no override",
+			func() {
+				viper.Set("noCache", true)
+			},
+			"myservice",
+			false,
+		},
+		{
+			"Service-level override set to true",
+			func() {
+				viper.Set("myservice.noCacheOverride", true)
+			},
+			"myservice",
+			true,
+		},
+		{
+			"Service-level override set to false",
+			func() {
+				viper.Set("myservice.noCacheOverride", false)
+			},
+			"myservice",
+			false,
+		},
+		{
+			"Global and service-level override both set, override takes precedence",
+			func() {
+				viper.Set("noCache", false)
+				viper.Set("myservice.noCacheOverride", true)
+			},
+			"myservice",
+			true,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.description,
+			func(t *testing.T) {
+				viper.Reset()
+				defer viper.Reset()
+				test.setupTestFunc()
+				result := getDisableCacheFromConfiguration(test.configPath)
+				if result != test.expectedDisableCache {
+					t.Errorf("Got unexpected disableCache value. Expected %t, got %t", test.expectedDisableCache, result)
+				}
+			})
+	}
+}

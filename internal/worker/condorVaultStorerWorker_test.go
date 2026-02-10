@@ -253,7 +253,7 @@ func TestCachedTokenStorerAndGetterHasCacheValue(t *testing.T) {
 		assert.True(t, c.hasInCache(testService))
 	})
 
-	// Test hasing a non-existing service under existing credd
+	// Test loading a non-existing service under existing credd
 	t.Run("non-existing service under existing credd", func(t *testing.T) {
 		assert.False(t, c.hasInCache("non_existing_service"))
 	})
