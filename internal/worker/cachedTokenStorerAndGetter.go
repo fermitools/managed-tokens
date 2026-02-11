@@ -76,6 +76,8 @@ func newCachedTokenStorerAndGetter(t TokenStorerAndGetter, currentCache *creddSe
 		currentCache = &c
 	}
 
+	currentCache.mux.Lock()
+	defer currentCache.mux.Unlock()
 	if _, ok := ((*currentCache).cache)[t.GetCredd()]; !ok {
 		(*currentCache).cache[t.GetCredd()] = make(map[string]struct{})
 	}

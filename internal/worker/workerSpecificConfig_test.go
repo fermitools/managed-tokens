@@ -47,7 +47,7 @@ func TestGetWorkerRetryValueFromConfig(t *testing.T) {
 			description:    "Empty config",
 			setupFunc:      func(c *Config) {},
 			testWorkerType: PushTokens,
-			errContains:    "no WorkerType PushTokens map found in Config",
+			errContains:    "given worker type not found in worker Config",
 		},
 		{
 			description: "Worker type does not exist in the config",
@@ -56,7 +56,7 @@ func TestGetWorkerRetryValueFromConfig(t *testing.T) {
 				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
 			},
 			testWorkerType: PushTokens,
-			errContains:    "no NumRetriesOption found for workerType",
+			errContains:    "given worker-specific configuration option not set in worker Config",
 		},
 		{
 			description: "Worker type is invalid",
@@ -123,7 +123,7 @@ func TestGetWorkerRetrySleepValueFromConfig(t *testing.T) {
 			description:    "Empty config",
 			setupFunc:      func(c *Config) {},
 			testWorkerType: PushTokens,
-			errContains:    "no WorkerType PushTokens map found in Config",
+			errContains:    "given worker type not found in worker Config",
 		},
 		{
 			description: "Worker type does not exist in the config",
@@ -132,7 +132,7 @@ func TestGetWorkerRetrySleepValueFromConfig(t *testing.T) {
 				c.workerSpecificConfig[PushTokens] = make(map[WorkerSpecificConfigOption]any, 0)
 			},
 			testWorkerType: PushTokens,
-			errContains:    "no RetrySleepOption found for workerType",
+			errContains:    "given worker-specific configuration option not set in worker Config",
 		},
 		{
 			description: "Worker type is invalid",
@@ -272,7 +272,7 @@ func TestGetAlternateTokenGetterOptionFromConfig(t *testing.T) {
 			},
 			workerType:  validWorkerType,
 			expectedVal: nil,
-			expectedErr: "no token getter configuration found for the given worker type",
+			expectedErr: "given worker type not found in worker Config",
 		},
 		{
 			description: "No AlternateTokenGetterOption found",
@@ -282,7 +282,7 @@ func TestGetAlternateTokenGetterOptionFromConfig(t *testing.T) {
 			},
 			workerType:  validWorkerType,
 			expectedVal: nil,
-			expectedErr: "no AlternateTokenGetterOption found for workerType",
+			expectedErr: "given worker-specific configuration option not set in worker Config",
 		},
 		{
 			description: "Value is not of type TokenGetter",
@@ -359,16 +359,6 @@ func TestGetAlternateTokenStorerAndGetterOptionFromConfig(t *testing.T) {
 			expectedErr: "",
 		},
 		{
-			description: "No AlternateTokenStorerAndGetterOption found",
-			setupFunc: func(c *Config) {
-				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-				c.workerSpecificConfig[validWorkerType] = make(map[WorkerSpecificConfigOption]any)
-			},
-			workerType:  validWorkerType,
-			expectedVal: nil,
-			expectedErr: "no AlternateTokenStorerAndGetterOption found for workerType",
-		},
-		{
 			description: "Value is not of type TokenStorerAndGetter",
 			setupFunc: func(c *Config) {
 				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
@@ -416,14 +406,40 @@ func TestGetAlternateTokenStorerAndGetterOptionFromConfig(t *testing.T) {
 		})
 	}
 
-	// Check case where there is no configuration setting for the StoreAndGetTokens worker type.  Should get an errNoWorkerTypeMapInConfig error
-	t.Run("No worker type map in config", func(t *testing.T) {
-		c := &Config{}
-		c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-		val, err := getAlternateTokenStorerAndGetterOptionFromConfig(*c, validWorkerType)
-		assert.Nil(t, val)
-		assert.ErrorIs(t, err, errNoWorkerTypeMapInConfig)
-	})
+	// Test Cases with specific errors
+	type testCase2 struct {
+		description string
+		setup       func(c *Config)
+		expectedErr error
+	}
+
+	testCases2 := []testCase2{
+		{
+			description: "No worker type map in config",
+			setup: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+			},
+			expectedErr: errNoWorkerTypeMapInConfig,
+		},
+		{
+			description: "No AlternateTokenStorerAndGetterOption found",
+			setup: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[StoreAndGetToken] = make(map[WorkerSpecificConfigOption]any)
+			},
+			expectedErr: errOptionNotSetInConfig,
+		},
+	}
+
+	for _, tc := range testCases2 {
+		t.Run(tc.description, func(t *testing.T) {
+			c := &Config{}
+			tc.setup(c)
+			val, err := getAlternateTokenStorerAndGetterOptionFromConfig(*c, validWorkerType)
+			assert.Nil(t, val)
+			assert.ErrorIs(t, err, tc.expectedErr)
+		})
+	}
 }
 
 func TestGetCachedTokenStorerOptionFromConfig(t *testing.T) {
@@ -449,16 +465,6 @@ func TestGetCachedTokenStorerOptionFromConfig(t *testing.T) {
 			workerType:  validWorkerType,
 			expectedVal: true,
 			expectedErr: "",
-		},
-		{
-			description: "No CachedTokenStorerOption found",
-			setupFunc: func(c *Config) {
-				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-				c.workerSpecificConfig[validWorkerType] = make(map[WorkerSpecificConfigOption]any)
-			},
-			workerType:  validWorkerType,
-			expectedVal: false,
-			expectedErr: "no CachedTokenStorerOption found for workerType",
 		},
 		{
 			description: "Value is not of type bool",
@@ -508,14 +514,40 @@ func TestGetCachedTokenStorerOptionFromConfig(t *testing.T) {
 		})
 	}
 
-	// Check case where there is no configuration setting for the StoreAndGetTokens worker type.  Should get an errNoWorkerTypeMapInConfig error
-	t.Run("No worker type map in config", func(t *testing.T) {
-		c := &Config{}
-		c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
-		val, err := getCachedTokenStorerOptionFromConfig(*c, StoreAndGetToken)
-		assert.False(t, val)
-		assert.ErrorIs(t, err, errNoWorkerTypeMapInConfig)
-	})
+	// Test cases with specific errors
+	type testCase2 struct {
+		description string
+		setup       func(c *Config)
+		expectedErr error
+	}
+
+	testCases2 := []testCase2{
+		{
+			description: "No worker type map in config",
+			setup: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+			},
+			expectedErr: errNoWorkerTypeMapInConfig,
+		},
+		{
+			description: "No CachedTokenStorerOption found",
+			setup: func(c *Config) {
+				c.workerSpecificConfig = make(map[WorkerType]map[WorkerSpecificConfigOption]any)
+				c.workerSpecificConfig[StoreAndGetToken] = make(map[WorkerSpecificConfigOption]any)
+			},
+			expectedErr: errOptionNotSetInConfig,
+		},
+	}
+
+	for _, tc := range testCases2 {
+		t.Run(tc.description, func(t *testing.T) {
+			c := &Config{}
+			tc.setup(c)
+			val, err := getCachedTokenStorerOptionFromConfig(*c, validWorkerType)
+			assert.False(t, val)
+			assert.ErrorIs(t, err, tc.expectedErr)
+		})
+	}
 }
 
 func TestGetWorkerTypeMapFromConfig(t *testing.T) {
