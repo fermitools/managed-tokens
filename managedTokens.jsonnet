@@ -58,6 +58,8 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
                         condorCollectorHostOverride: "specialcollectorhost.domain",
                         defaultRoleFileDestinationTemplateOverride: "/tmp/{{.DesiredUID}}_{{.Account}}",  # Any field in the worker.Config object is supported here
                         disableNotificationsOverride: false, # If true, no notifications will be sent for this role
+                        tokenGetterOverride: "getToken",
+                        noCacheOverride: true,
                     },
                 ),
             },
@@ -137,6 +139,7 @@ local notificationsConfig = import 'libsonnet/notificationsConfig.libsonnet';
     fileCopierOptions: "--perms --chmod=u=r,go=", # Extra options to give to the fileCopier utility - usually rsync,
     sshOptions: "-o Arg1=val1 -o Arg2=val2", # Options to use with fileCopier to establish the SSH connection
     disableNotifications: false, # If true, no notifications will be sent
+    noCache: false, # If true, condor token store-and-getters will not use the cache and will always get a new vault token, and store it in the credd
 
     # Optional, and should not be used in production.  Defaults to "production", but can be specified here
     # or with environment variable MANAGED_TOKENS_DEV_ENVIRONMENT_LABEL

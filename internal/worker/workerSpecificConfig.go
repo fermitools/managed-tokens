@@ -42,6 +42,9 @@ const (
 	// supported by the StoreAndGetToken WorkerType, and the value of the AlternateTokenStorerAndGetterOption must be of a type that
 	// implements the TokenStorerAndGetter interface.
 	AlternateTokenStorerAndGetterOption
+	// CachedTokenStorerOption is a worker-specific configuration option that represents whether to use a cached token storer. It is
+	// supported by the StoreAndGetToken WorkerType, and the value of the CachedTokenStorerOption must be of type bool.
+	CachedTokenStorerOption
 	invalidWorkerSpecificConfigOption
 )
 
@@ -93,6 +96,16 @@ func SetInteractiveTokenGetterOption(w WorkerType, interactive bool) ConfigOptio
 	return SetWorkerSpecificConfigOption(w, InteractiveTokenGetterOption, interactive)
 }
 
+// SetCachedTokenStorerOption sets the cached token storer option for the specified WorkerType.
+// Setting useCache to true enables caching; false disables it.
+// If the WorkerType is not StoreAndGetToken, it returns a no-op ConfigOption.
+func SetCachedTokenStorerOption(w WorkerType, useCache bool) ConfigOption {
+	if w != StoreAndGetToken {
+		return ConfigOption(func(*Config) error { return nil }) // No-op
+	}
+	return SetWorkerSpecificConfigOption(w, CachedTokenStorerOption, useCache)
+}
+
 // SetAlternateTokenGetterOption sets an alternate TokenGetter for the specified WorkerType.
 // This allows customization of token retrieval logic for individual worker types.
 func SetAlternateTokenGetterOption(w WorkerType, tokenGetter TokenGetter) ConfigOption {
@@ -139,18 +152,20 @@ func ValidTokenGetterWorkerTypes() iter.Seq[WorkerType] {
 // Getters
 // getWorkerRetryValueFromConfig retrieves the retry value for a specific worker type from the given configuration.
 // It returns the retry value as a uint and a non-nil error if the worker type is not found in the configuration or if the value is not of type uint.
+// If the option is not set in the config, the returned error will be errOptionNotSetInConfig, and callers should check
+// for that error.
 func getWorkerNumRetriesValueFromConfig(c Config, w WorkerType) (uint, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidRetryWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return 0, fmt.Errorf("no WorkerType %s map found in Config: %w", w, err)
+			return 0, fmt.Errorf("%w: %s", err, w)
 		}
 		return 0, err
 	}
 
 	val, ok := m[NumRetriesOption]
 	if !ok {
-		return 0, fmt.Errorf("no NumRetriesOption found for workerType %s in workerSpecificConfig", w)
+		return 0, fmt.Errorf("%w: NumRetriesOption for workerType %s", errOptionNotSetInConfig, w)
 	}
 
 	valUInt, ok := val.(uint)
@@ -162,18 +177,20 @@ func getWorkerNumRetriesValueFromConfig(c Config, w WorkerType) (uint, error) {
 }
 
 // getWorkerRetrySleepValueFromConfig retrieves the retrySleepValue for a specific worker type from the given configuration.
+// If the option is not set in the config, the returned error will be errOptionNotSetInConfig, and callers should check
+// for that error.
 func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidRetryWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return 0, fmt.Errorf("no WorkerType %s map found in Config: %w", w, err)
+			return 0, fmt.Errorf("%w: %s", err, w)
 		}
 		return 0, err
 	}
 
 	val, ok := m[RetrySleepOption]
 	if !ok {
-		return 0, fmt.Errorf("no RetrySleepOption found for workerType %s in workerSpecificConfig", w)
+		return 0, fmt.Errorf("%w: RetrySleepOption for workerType %s", errOptionNotSetInConfig, w)
 	}
 
 	valTime, ok := val.(time.Duration)
@@ -186,11 +203,13 @@ func getWorkerRetrySleepValueFromConfig(c Config, w WorkerType) (time.Duration, 
 
 // getInteractiveTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
 // If the worker type is not supported or invalid, an error is returned.
+// If the option is not set in the config, the returned error will be errOptionNotSetInConfig, and callers should check
+// for that error.
 func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return false, errors.New("no token getter configuration found for the given worker type")
+			return false, fmt.Errorf("%w: %s", err, w)
 		}
 		return false, err
 	}
@@ -198,7 +217,7 @@ func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, er
 	// Does that map have the InteractiveTokenGetterOption key set?
 	val, ok := m[InteractiveTokenGetterOption]
 	if !ok {
-		return false, nil // This is not an error case - just that the option is not set
+		return false, fmt.Errorf("%w: InteractiveTokenGetterOption for %s", errOptionNotSetInConfig, w)
 	}
 
 	// Type-check the value
@@ -212,18 +231,20 @@ func getInteractiveTokenGetterOptionFromConfig(c Config, w WorkerType) (bool, er
 
 // getAlternateTokenGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
 // If the worker type is not supported or invalid, an error is returned.
+// If the option is not set in the config, the returned error will be errOptionNotSetInConfig, and callers should check
+// for that error.
 func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGetter, error) {
 	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return nil, errors.New("no token getter configuration found for the given worker type")
+			return nil, fmt.Errorf("%w: %s", err, w)
 		}
 		return nil, err
 	}
 
 	val, ok := m[AlternateTokenGetterOption]
 	if !ok {
-		return nil, fmt.Errorf("no AlternateTokenGetterOption found for workerType %s in workerSpecificConfig", w)
+		return nil, fmt.Errorf("%w: AlternateTokenGetterOption for workerType %s", errOptionNotSetInConfig, w)
 	}
 
 	valInterface, ok := val.(TokenGetter)
@@ -235,18 +256,20 @@ func getAlternateTokenGetterOptionFromConfig(c Config, w WorkerType) (TokenGette
 }
 
 // getAlternateTokenStorerAndGetterOptionFromConfig retrieves the interactiveTokenGetterOption for a specific worker type from the given configuration.
+// If the option is not set in the config, the returned error will be errOptionNotSetInConfig, and callers should check
+// for that error.
 func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (TokenStorerAndGetter, error) {
-	m, err := getWorkerTypeMapFromConfig(c, w, slices.Collect(ValidTokenGetterWorkerTypes()))
+	m, err := getWorkerTypeMapFromConfig(c, w, []WorkerType{StoreAndGetToken})
 	if err != nil {
 		if errors.Is(err, errNoWorkerTypeMapInConfig) {
-			return nil, errors.New("no token getter configuration found for the given worker type")
+			return nil, fmt.Errorf("%w: %s", err, w)
 		}
 		return nil, err
 	}
 
 	val, ok := m[AlternateTokenStorerAndGetterOption]
 	if !ok {
-		return nil, fmt.Errorf("no AlternateTokenStorerAndGetterOption found for workerType %s in workerSpecificConfig", w)
+		return nil, fmt.Errorf("%w: AlternateTokenStorerAndGetterOption for workerType %s", errOptionNotSetInConfig, w)
 	}
 
 	valInterface, ok := val.(TokenStorerAndGetter)
@@ -255,6 +278,33 @@ func getAlternateTokenStorerAndGetterOptionFromConfig(c Config, w WorkerType) (T
 	}
 
 	return valInterface, nil
+}
+
+// getCachedTokenStorerOptionFromConfig retrieves the cachedTokenStorerOption for a specific worker type from the given configuration.
+// Note that callers should check the error to make sure that no error was returned, and if so, determine the appropriate default value
+// for their use case.
+// If the option is not set in the config, the returned error will be errOptionNotSetInConfig, and callers should check
+// for that error.
+func getCachedTokenStorerOptionFromConfig(c Config, w WorkerType) (bool, error) {
+	m, err := getWorkerTypeMapFromConfig(c, w, []WorkerType{StoreAndGetToken})
+	if err != nil {
+		if errors.Is(err, errNoWorkerTypeMapInConfig) {
+			return false, fmt.Errorf("%w: %s", err, w)
+		}
+		return false, err
+	}
+
+	val, ok := m[CachedTokenStorerOption]
+	if !ok {
+		return false, fmt.Errorf("%w: CachedTokenStorerOption for workerType %s", errOptionNotSetInConfig, w)
+	}
+
+	valBool, ok := val.(bool)
+	if !ok {
+		return false, fmt.Errorf("value for workerType %s is not of type bool.  Got type %T", w, val)
+	}
+
+	return valBool, nil
 }
 
 func isValidWorkerSpecificConfigOption(option WorkerSpecificConfigOption) bool {
@@ -281,4 +331,7 @@ func getWorkerTypeMapFromConfig(c Config, w WorkerType, validWorkerTypes []Worke
 	return m, nil
 }
 
-var errNoWorkerTypeMapInConfig error = errors.New("given worker type not found in worker Config")
+var (
+	errNoWorkerTypeMapInConfig error = errors.New("given worker type not found in worker Config")
+	errOptionNotSetInConfig    error = errors.New("given worker-specific configuration option not set in worker Config")
+)

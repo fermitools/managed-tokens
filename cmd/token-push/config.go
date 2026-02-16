@@ -412,6 +412,15 @@ func getTokenGetterOverrideFromConfiguration(configPath string) worker.WorkerTyp
 	return _default
 }
 
+// getDisableCacheFromConfiguration checks the configuration for the "noCache" key.
+// If the override key "<configPath>.noCacheOverride" exists, its value is used.
+func getDisableCacheFromConfiguration(configPath string) bool {
+	if disableCachePath, overridden := getConfigOverridePath(configPath, "noCache"); overridden {
+		return viper.GetBool(disableCachePath)
+	}
+	return viper.GetBool("noCache") // default
+}
+
 // resolveDisableNotifications checks each service's configuration to determine if notifications should be disabled.
 // It takes a slice of service objects as input and returns a boolean indicating whether admin notifications should be disabled,
 // and a slice of strings containing the names of services for which notifications should be disabled.

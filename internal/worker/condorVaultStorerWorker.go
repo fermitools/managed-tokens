@@ -118,6 +118,9 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 		log.Debug("Using default timeout for vault storer")
 	}
 
+	// Initialize cache for worker so we don't store the same token in the same credd more than once.
+	cache := newCreddServiceCache()
+
 	for sc := range chans.serviceConfigChan {
 		func(sc *Config) {
 			success := &vaultStorerSuccess{
@@ -136,9 +139,30 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 			})
 
 			interactive, err := getInteractiveTokenGetterOptionFromConfig(*sc, StoreAndGetToken)
-			if err != nil && !errors.Is(err, errNoWorkerTypeMapInConfig) {
-				configLogger.Warn("Could not get interactive token getter option from config.  Using non-interactive token storer by default")
-				interactive = false
+			if err != nil {
+				interactive = false // Default to not using interactive token getter if there is any error getting the option from config
+				if !errors.Is(err, errNoWorkerTypeMapInConfig) && !errors.Is(err, errOptionNotSetInConfig) {
+					configLogger.Warn("Could not get interactive token getter option from config.  Using non-interactive token storer by default")
+				}
+			}
+
+			// Note that here, if the configuration option for caching tokens isn't set in the map, we'll get an errNoWorkerTypeMapInConfig error,
+			// and in that case, we want to default to using the cache
+			defaultUseCache := true
+			useCache, err := getCachedTokenStorerOptionFromConfig(*sc, StoreAndGetToken)
+			switch {
+			case errors.Is(err, errNoWorkerTypeMapInConfig) || errors.Is(err, errOptionNotSetInConfig): // The default case here - nothing is set in the configuration
+				useCache = defaultUseCache // No config option found for this, so use default
+				configLogger.Debug("No cached token storer configuration found for this worker type.  Using cached token storer by default")
+			case err != nil: // Here, we have some non-nil error that isn't errNoWorkerTypeMapInConfig, which means there was some other error
+				// retrieving the option from the config.  Thus, we want to use the default
+				useCache = defaultUseCache
+				configLogger.Warn("Could not get cached token storer option from config.  Using cached token storer by default")
+			}
+			// If there's no error getting the config option for caching, then use whatever the config says
+
+			if !useCache {
+				configLogger.Info("Not using cache for token storing for this service")
 			}
 
 			errsToReport := make([]error, 0) // slice of errors we need to specifically highlight
@@ -159,12 +183,22 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 						useTokenStorerAndGetter = vaultToken.NewVaultStorerClient(schedd, sc.VaultServer, &sc.CommandEnvironment)
 					}
 
+					// Wrap the TokenStorerAndGetter in a CachedTokenStorerAndGetter
+					var c CachedTokenStorerAndGetter
+					if !useCache {
+						c = &noOpCachedTokenStorerAndGetter{useTokenStorerAndGetter}
+					} else {
+						_c := newCachedTokenStorerAndGetter(useTokenStorerAndGetter, &cache) // Since cache is a map, it's passed by reference,
+						// so any updates in the storeAndGetTokensForSchedd call will carry to the next iteration
+						c = &_c
+					}
+
 					vaultStorerContext, vaultStorerCancel := context.WithTimeout(ctx, vaultStorerTimeout)
 					defer vaultStorerCancel()
 
 					if err := storeAndGetTokensForSchedd(
 						vaultStorerContext,
-						useTokenStorerAndGetter,
+						c,
 						sc.Service.Name(),
 						sc.ServiceCreddVaultTokenPathRoot,
 						interactive); err != nil {
@@ -215,7 +249,7 @@ func storeAndGetTokenWorker(ctx context.Context, chans channelGroup) {
 //  2. Ensures that any new token obtained is stored for future use, provided the operation succeeds.
 //  3. Calls the provided TokenStorerAndGetter to obtain and store a new vault token, optionally
 //     using interactive mode.
-func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
+func storeAndGetTokensForSchedd(ctx context.Context, t CachedTokenStorerAndGetter, serviceName string, tokenRootPath string, interactive bool) error {
 	ctx, span := otel.GetTracerProvider().Tracer("managed-tokens").Start(ctx, "worker.StoreAndGetTokensForSchedd")
 	span.SetAttributes(attribute.String("tokenRootPath", tokenRootPath))
 	span.SetAttributes(attribute.String("service", serviceName))
@@ -230,11 +264,18 @@ func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, ser
 	})
 	start := time.Now()
 
-	// Before we stage any prior vault token, check to make sure our context hasn't already been canceled
+	// Before we do anything, check to make sure our context hasn't already been canceled
 	if ctx.Err() != nil {
 		tracing.LogErrorWithTrace(span, funcLogger, "context was canceled or the deadline exceeded before token vault staging.  Will not attempt to stage a stored token file or store vault token")
 		success = false
 		return ctx.Err()
+	}
+
+	// First, check our cache.  If it has the combo of t.GetCredd() and serviceName, we already have the token, so stop here
+	if t.hasInCache(serviceName) {
+		msg := "Token for service/credd combination already stored in cache for this worker run.  Skipping store and get operation."
+		tracing.LogSuccessWithTrace(span, funcLogger, msg)
+		return nil
 	}
 
 	// Stage prior vault token, if it exists
@@ -281,12 +322,14 @@ func storeAndGetTokensForSchedd(ctx context.Context, t TokenStorerAndGetter, ser
 	}
 
 	// Store vault token on credd
-	// if err := vaultToken.StoreAndValidateToken(ctx, ts, environ); err != nil {
 	if err := t.GetAndStoreToken(ctx, serviceName, interactive); err != nil {
 		storeFailureCount.WithLabelValues(serviceName, t.GetCredd()).Inc()
 		span.SetStatus(codes.Error, "could not store or validate vault token")
 		return err
 	}
+
+	// Add to cache that we have stored this token for this credd/serviceName combo
+	t.storeInCache(serviceName)
 
 	dur := time.Since(start).Seconds()
 	tokenStoreTimestamp.WithLabelValues(serviceName, t.GetCredd()).SetToCurrentTime()

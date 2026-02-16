@@ -46,6 +46,8 @@
                ],
                "disableNotificationsOverride": false,
                "keytabPathOverride": "/special/path/to/keytab",
+               "noCacheOverride": true,
+               "tokenGetterOverride": "getToken",
                "userPrincipalOverride": "dunepro/kerberos/principal@REALM"
             }
          }

@@ -433,6 +433,15 @@ func run(ctx context.Context) error {
 				tokenGetterInteractiveSelector = worker.SetInteractiveTokenGetterOption(tokenGetterWT, true)
 			}
 
+			// Figure out if we should disable caching or not for this service config
+			disableCache := false // Default - do not disable caching
+			// If the configuration for a particular service tells us to disable caching, or the --no-cache flag is set, disable caching
+			if getDisableCacheFromConfiguration(serviceConfigPath) || viper.GetBool("no-cache") {
+				funcLogger.Debug("Disabling token storer cache for this service based on configuration or flag")
+				disableCache = true
+			}
+			disableStorerCacheSelector := worker.SetCachedTokenStorerOption(worker.StoreAndGetToken, !disableCache)
+
 			// Service-level configuration items that can be defined either in configuration file or on system/environment or have library defaults
 			keytabPath := getKeytabFromConfiguration(serviceConfigPath)
 			defaultRoleFileDestinationTemplate := getDefaultRoleFileDestinationTemplate(serviceConfigPath)
@@ -462,6 +471,7 @@ func run(ctx context.Context) error {
 				worker.SetSupportedExtrasKeyValue(worker.PingOptions, extraPingOpts),
 				worker.SetSupportedExtrasKeyValue(worker.SSHOptions, sshOpts),
 				tokenGetterInteractiveSelector,
+				disableStorerCacheSelector,
 			)
 			if err != nil {
 				tracing.LogErrorWithTrace(span, funcLogger, "Could not create config for service")
@@ -672,6 +682,7 @@ func initFlags() error {
 	pflag.Bool("dont-notify", false, "Same as --disable-notifications")
 	pflag.StringP("experiment", "e", "", "Name of single experiment to push tokens")
 	pflag.Bool("list-services", false, "List all configured services in config file")
+	pflag.Bool("no-cache", false, "Disable caching of vault tokens for all services during current run")
 	pflag.Bool("no-loki", false, "Disable sending logs to Loki (should only be used in testing or temporary debugging)")
 	pflag.BoolP("push-tokens", "p", false, "Push tokens to nodes after onboarding a service. If -r/--run-onboarding is set, this flag must be set to push tokens.  Otherwise, it is ignored")
 	pflag.BoolP("run-onboarding", "r", false, "Run onboarding for a given service.  Must be used with -s/--service, optionally can be used with -p/--push-tokens")
