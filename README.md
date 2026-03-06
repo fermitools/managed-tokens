@@ -66,6 +66,12 @@ These are the current prometheus metrics that can be pushed from the Managed Tok
 * `managed_tokens_token_store_duration_seconds`: Duration (in seconds) for a vault token to get stored in a condor credd
 * `managed_tokens_failed_vault_token_store_count`: The number of times the Managed Tokens Service failed to store a vault token in a condor credd
 
+#### Vault Token Obtaining metrics
+* `managed_tokens_last_token_get_timestamp`: Timestamp of the last successful obtaining of a service vault token by the Managed Tokens Service
+* `managed_tokens_token_get_duration_seconds`: Duration (in seconds) for a vault token to be obtained from the Vault or OpenBao instance.
+* `managed_tokens_failed_vault_token_get_count`: The number of times the Managed Tokens Service failed to obtain a vault token
+
+
 #### Node-pinging metrics
 * `managed_tokens_ping_duration_seconds`: Duration (in seconds) to ping a node
 * `managed_tokens_failed_ping_count`: The number of times the Managed Tokens Service failed to ping a node
