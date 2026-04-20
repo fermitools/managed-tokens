@@ -25,7 +25,7 @@ type CachedTokenStorerAndGetter interface {
 }
 
 // creddServiceCache is a cache that keeps track of which service/credd combinations have already had tokens stored for them
-// Since this cache can be shared, the provide store and has methods use the mutex to protect access to the cache map
+// Since this cache can be shared, the provided store and has methods use the mutex to protect access to the cache map
 type creddServiceCache struct {
 	cache map[string]map[string]struct{} // {credd: {serviceName: struct{}{}}}
 	mux   sync.Mutex
